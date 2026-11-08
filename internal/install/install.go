@@ -52,9 +52,14 @@ func (in *Installer) rememberClone(src string) error {
 }
 
 // IsClone — в папке клон репозитория vpnlock: модуль vpnlock и папка setup.
+// Git для Windows по умолчанию (core.autocrlf) кладёт файлы с CRLF — первая
+// строка go.mod сверяется без \r.
 func IsClone(dir string) bool {
 	data, err := os.ReadFile(filepath.Join(dir, "go.mod"))
-	if err != nil || !strings.HasPrefix(string(data), "module vpnlock\n") {
+	if err != nil {
+		return false
+	}
+	if first, _, _ := strings.Cut(string(data), "\n"); strings.TrimSuffix(first, "\r") != "module vpnlock" {
 		return false
 	}
 	fi, err := os.Stat(filepath.Join(dir, "setup"))

@@ -172,11 +172,14 @@ var (
 )
 
 // result — код возврата функции WFP: 0 — успех, иначе FWP_E_* или ошибка Win32.
+// Код — DWORD, старшая половина регистра не определена: на ARM64 FWP_E_*
+// приходят с расширенным знаком (0xffffffff80320009), и без uint32 сравнение
+// с fwpAlreadyExists не срабатывало бы.
 func result(r uintptr) error {
-	if r == 0 {
+	if uint32(r) == 0 {
 		return nil
 	}
-	return windows.Errno(r)
+	return windows.Errno(uint32(r))
 }
 
 // fwpEngine — открытая сессия WFP.
@@ -387,8 +390,8 @@ func packageSID(family string) ([]byte, error) {
 	}
 	var sid *windows.SID
 	r, _, _ := procDeriveAppContainerSid.Call(uintptr(unsafe.Pointer(p)), uintptr(unsafe.Pointer(&sid)))
-	if r != 0 {
-		return nil, fmt.Errorf("SID пакета %s: %w", family, windows.Errno(r))
+	if err := result(r); err != nil {
+		return nil, fmt.Errorf("SID пакета %s: %w", family, err)
 	}
 	defer windows.FreeSid(sid)
 	return append([]byte(nil), unsafe.Slice((*byte)(unsafe.Pointer(sid)), windows.GetLengthSid(sid))...), nil
