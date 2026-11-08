@@ -13,8 +13,10 @@ type Folders struct {
 	Profiles string   // C:\Users: профили и их стандартные папки
 }
 
-// profileShared — стандартные папки внутри профиля пользователя.
-var profileShared = []string{``, `AppData`, `AppData\Local`, `AppData\Local\Programs`, `AppData\Roaming`, `Desktop`, `Downloads`, `Documents`}
+// profileShared — стандартные папки внутри профиля пользователя. .local\bin —
+// общая папка консольных программ: туда ставятся Claude Code, uv и другие, и
+// защита одной не должна закрывать соседей.
+var profileShared = []string{``, `AppData`, `AppData\Local`, `AppData\Local\Programs`, `AppData\Roaming`, `Desktop`, `Downloads`, `Documents`, `.local\bin`}
 
 // squirrelVersion — папка версии у приложений на Squirrel (Discord, Slack):
 // app-1.0.9035 рядом с Update.exe.

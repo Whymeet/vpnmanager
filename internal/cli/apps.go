@@ -32,48 +32,10 @@ func addApp(env Env, args []string) int {
 	}
 	var path, name string
 	switch {
-	case len(args) == 1 && looksLikePath(args[0]):
-		path = args[0]
-		if abs, err := filepath.Abs(path); err == nil {
-			path = abs
-		}
 	case len(args) == 1:
-		found, command := findInstalled(env, args[0]), findCommand(args[0])
-		service, ok := pickService(env, args[0], command)
-		if !ok {
+		var ok bool
+		if path, name, _, ok = resolveApp(env, args[0]); !ok {
 			return 1
-		}
-		// Claude — приложение, claude — команда: у приложений имя как в Finder,
-		// у команд — как их набирают. Путь нужен, только если совпало и то и другое.
-		if command != "" && !slices.ContainsFunc(found, func(a apps.App) bool { return a.Name == args[0] }) {
-			found = nil
-		}
-		switch {
-		case service != "":
-			path = service
-		case len(found) > 0 && command != "":
-			fmt.Fprintf(env.Err, "Под «%s» подходит и приложение, и консольная программа — укажи путь:\n  vpnlock add %q   — приложение\n  vpnlock add %q   — консольная программа\n", args[0], found[0].Path, command)
-			return 1
-		case command != "":
-			path = command
-		case len(found) == 0:
-			also := ""
-			switch runtime.GOOS {
-			case "darwin":
-				also = ", и консольной программы с таким именем тоже"
-			case "linux":
-				also = ", и консольной программы со службой с таким именем тоже"
-			}
-			fmt.Fprintf(env.Err, "Приложения «%s» нет %s%s. Список установленных — vpnlock add (без имени), в терминале.\n", args[0], installedWhere(), also)
-			return 1
-		case len(found) > 1:
-			fmt.Fprintf(env.Err, "Под «%s» подходит несколько приложений — укажи путь:\n", args[0])
-			for _, a := range found {
-				fmt.Fprintf(env.Err, "  %s\n", a.Path)
-			}
-			return 1
-		default:
-			path, name = found[0].Path, found[0].Name
 		}
 	default:
 		if !env.Interactive {
@@ -94,17 +56,72 @@ func addApp(env Env, args []string) int {
 		fmt.Fprintln(env.Err, resp.Error)
 		return 1
 	}
-	switch {
-	case resp.App.Catalog:
-		fmt.Fprintf(env.Out, "%s защищено по каталогу курса: без проверенного VPN его сервисы закрыты.\n", resp.App.Name)
-	case resp.App.Learned:
-		fmt.Fprintf(env.Out, "%s защищено: в сеть оно выходит только через проверенный VPN.\n", resp.App.Name)
-	case resp.App.Command:
-		fmt.Fprintf(env.Out, "%s добавлено и ждёт обучения. Включи VPN и поработай в программе пару минут: служба запомнит, куда она ходит, и статус сменится на «защищено». Адреса учатся только в эти минуты — не открывай через неё посторонние сайты.\n", resp.App.Name)
-	default:
-		fmt.Fprintf(env.Out, "%s добавлено и ждёт обучения. Включи VPN и поработай в приложении пару минут: служба запомнит, куда оно ходит, и статус сменится на «защищено».\n", resp.App.Name)
-	}
+	printAdded(env, *resp.App)
 	return 0
+}
+
+// printAdded — что стало с только что добавленным приложением.
+func printAdded(env Env, a ipc.AppStatus) {
+	switch {
+	case a.Catalog:
+		fmt.Fprintf(env.Out, "%s защищено по каталогу курса: без проверенного VPN его сервисы закрыты.\n", a.Name)
+	case a.Learned:
+		fmt.Fprintf(env.Out, "%s защищено: в сеть оно выходит только через проверенный VPN.\n", a.Name)
+	case a.Command:
+		fmt.Fprintf(env.Out, "%s добавлено и ждёт обучения. Включи VPN и поработай в программе пару минут: служба запомнит, куда она ходит, и статус сменится на «защищено». Адреса учатся только в эти минуты — не открывай через неё посторонние сайты.\n", a.Name)
+	default:
+		fmt.Fprintf(env.Out, "%s добавлено и ждёт обучения. Включи VPN и поработай в приложении пару минут: служба запомнит, куда оно ходит, и статус сменится на «защищено».\n", a.Name)
+	}
+}
+
+// resolveApp находит, что защищать по аргументу add: путь к пакету или exe,
+// консольную программу по имени (macOS, Linux), службу systemd (Linux) или
+// приложение по имени. name — имя для людей, если оно известно. Не нашлось —
+// ok ложно, причина уже в env.Err; missing — такого на компьютере нет вовсе
+// (конфиг такую строку пропускает).
+func resolveApp(env Env, arg string) (path, name string, missing, ok bool) {
+	if looksLikePath(arg) {
+		if abs, err := filepath.Abs(arg); err == nil {
+			arg = abs
+		}
+		return arg, "", false, true
+	}
+	found, command := findInstalled(env, arg), findCommand(arg)
+	service, ok := pickService(env, arg, command)
+	if !ok {
+		return "", "", false, false
+	}
+	// Claude — приложение, claude — команда: у приложений имя как в Finder,
+	// у команд — как их набирают. Путь нужен, только если совпало и то и другое.
+	if command != "" && !slices.ContainsFunc(found, func(a apps.App) bool { return a.Name == arg }) {
+		found = nil
+	}
+	switch {
+	case service != "":
+		return service, "", false, true
+	case len(found) > 0 && command != "":
+		fmt.Fprintf(env.Err, "Под «%s» подходит и приложение, и консольная программа — укажи путь:\n  vpnlock add %q   — приложение\n  vpnlock add %q   — консольная программа\n", arg, found[0].Path, command)
+		return "", "", false, false
+	case command != "":
+		return command, "", false, true
+	case len(found) == 0:
+		also := ""
+		switch runtime.GOOS {
+		case "darwin":
+			also = ", и консольной программы с таким именем тоже"
+		case "linux":
+			also = ", и консольной программы со службой с таким именем тоже"
+		}
+		fmt.Fprintf(env.Err, "Приложения «%s» нет %s%s. Список установленных — vpnlock add (без имени), в терминале.\n", arg, installedWhere(), also)
+		return "", "", true, false
+	case len(found) > 1:
+		fmt.Fprintf(env.Err, "Под «%s» подходит несколько приложений — укажи путь:\n", arg)
+		for _, a := range found {
+			fmt.Fprintf(env.Err, "  %s\n", a.Path)
+		}
+		return "", "", false, false
+	}
+	return found[0].Path, found[0].Name, false, true
 }
 
 // installedWhere — где лежат установленные приложения, для сообщений.

@@ -22,6 +22,7 @@ func TestInstallTarget(t *testing.T) {
 		{`C:\Users\Иван\Downloads\portable.exe`, `C:\Users\Иван\Downloads\portable.exe`},
 		{`C:\Users\Иван\Desktop\app.exe`, `C:\Users\Иван\Desktop\app.exe`},
 		{`C:\Users\Иван\AppData\Local\Programs\setup.exe`, `C:\Users\Иван\AppData\Local\Programs\setup.exe`},
+		{`C:\Users\Иван\.local\bin\claude.exe`, `C:\Users\Иван\.local\bin\claude.exe`},
 		{`C:\Users\Иван\app.exe`, `C:\Users\Иван\app.exe`},
 		{`C:\Users\app.exe`, `C:\Users\app.exe`},
 		{`C:\app.exe`, `C:\app.exe`},

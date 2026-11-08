@@ -122,6 +122,8 @@ func Run(args []string, env Env) int {
 		return protect(env, args[0], args[1:])
 	case "import":
 		return importFile(env, args[1:])
+	case "apply":
+		return apply(env, args[1:])
 	case "notify-agent":
 		return notifyAgent(env)
 	case "tray":
@@ -139,7 +141,7 @@ func Run(args []string, env Env) int {
 }
 
 func usage(w io.Writer) {
-	fmt.Fprint(w, `vpnlock — приложения выходят в сеть только через проверенный VPN.
+	fmt.Fprintf(w, `vpnlock — приложения выходят в сеть только через проверенный VPN.
 
 vpnlock без команды открывает меню: всё выбирается стрелками.
 
@@ -165,8 +167,11 @@ vpnlock без команды открывает меню: всё выбирае
   vpnlock unprotect <домен|адрес>...  снять защиту с домена или адреса
   vpnlock import <файл>               закрыть сразу всё из файла: выгрузка catalog export или список доменов и адресов
 
+Конфиг — программы, домены и настройки одним файлом:
+  vpnlock apply [файл]                применить конфиг; без файла — конфиг этой системы из клона, configs/%s
+
 Установка и обновление — по setup/README.md в клоне репозитория.
-`)
+`, configName(runtime.GOOS))
 }
 
 // protect/unprotect — служебные команды: защищаемый сервис задаётся доменом
