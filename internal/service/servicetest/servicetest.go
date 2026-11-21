@@ -651,6 +651,8 @@ type Fakes struct {
 	Apps         *Scanner
 	Answers      *Answers
 	Notify       *Notifier
+	// NotifyAfter — сколько закрытие длится до уведомления; по умолчанию сразу.
+	NotifyAfter time.Duration
 	// ReadApp — как служба узнаёт приложение по пути; по умолчанию — пакет .app.
 	ReadApp func(path string) (apps.App, error)
 }
@@ -760,7 +762,7 @@ func launch(L paths.Layout, f Fakes) *Service {
 			SystemDNS: f.SystemDNS, DNSAddr: s.DNSAddr, Notify: f.Notify, Reach: f.Enforce.Reach,
 			Apps: f.Apps, Answers: f.Answers, ReadApp: f.ReadApp, ScanEvery: ScanEvery, LearnFor: LearnFor, RemindEvery: RemindEvery,
 			PhysicalAddr: func() (netip.Addr, bool) { return PhysicalAddr, true },
-			CheckEvery:   CheckEvery, ProbeEvery: CheckEvery, GuardEvery: GuardEvery, Now: time.Now,
+			CheckEvery:   CheckEvery, ProbeEvery: CheckEvery, GuardEvery: GuardEvery, Now: time.Now, NotifyAfter: f.NotifyAfter,
 			Physical: func() (core.Tunnel, bool) { return PhysicalIface, true },
 			Logf:     func(string, ...any) {},
 		})

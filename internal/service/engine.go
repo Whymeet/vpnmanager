@@ -66,12 +66,14 @@ type engine struct {
 	servers map[netip.Addr]bool
 	names   nameCache   // какие имена стоят за адресами: ответы DNS туннеля
 	bg      *background // фоновые запросы (resolveLater): остановка их ждёт
-	// notifyOff — уведомления выключены; notified — текст последнего
-	// уведомления, пока сервисы с тех пор не открывались.
-	notifyOff bool
-	notified  string
-	hub       hub       // подписчики на уведомления по каналу службы
-	sync      syncState // ежедневное обновление каталога
+	// notifyOff — уведомления выключены; notified — текст последнего события
+	// для уведомления (открыто с выходом или закрыто с причиной); closedSince —
+	// с какого времени сервисы закрыты (нулевое — открыты).
+	notifyOff   bool
+	notified    string
+	closedSince time.Time
+	hub         hub       // подписчики на уведомления по каналу службы
+	sync        syncState // ежедневное обновление каталога
 }
 
 // configStore — то, что движку нужно от настроек: изменить и записать.
@@ -183,6 +185,7 @@ func (e *engine) run(ctx context.Context) {
 		case <-tick.C:
 			e.retryFailed()
 			e.checkAll(ctx)
+			e.notifyDue()
 		case r := <-e.results:
 			e.mu.Lock()
 			delete(e.inflight, r.key)
@@ -306,16 +309,7 @@ func (e *engine) reapply() error {
 	e.mu.Unlock()
 
 	e.record(events)
-	if note != "" {
-		e.hub.publish(note)
-	}
-	if note != "" && e.d.Notify != nil {
-		go func() {
-			if err := e.d.Notify.Notify(note); err != nil {
-				e.d.Logf("%v", err)
-			}
-		}()
-	}
+	e.notify(note)
 	if !need {
 		return nil
 	}
@@ -373,21 +367,82 @@ func (e *engine) protectionEvent(prot core.Protection) *core.Event {
 	return &core.Event{Time: now, Kind: core.KindClosed, Text: "сервисы закрыты: " + prot.Reason}
 }
 
-// notification — текст уведомления о закрытии сервисов; пусто — уведомлять не
-// о чем. Одно уведомление на событие: тот же текст не повторяется, пока
-// сервисы снова не откроются, а пока идёт проверка (причины нет), молчим.
+// notification — уведомление о смене защиты: сервисы открылись или сменили
+// выход (адрес и страна выхода) либо закрылись (причина). Пустой текст —
+// уведомлять не о чем. Одно уведомление на событие: тот же текст подряд не
+// повторяется, а пока идёт проверка (закрыто без причины), молчим.
+//
+// О закрытии — только если оно длится дольше NotifyAfter: VPN, который
+// переподключается, не дёргает человека. Сервисы при этом закрыты сразу,
+// задерживается одно уведомление; дождалось — его отдаёт notifyDue. После
+// такого обрыва открытие тем же выходом — то же событие, что и до него.
+//
+// Последнее событие помнится и при выключенных уведомлениях: включили —
+// уведомление придёт о следующем событии, а не о том, что случилось без них.
 // Вызывать под e.mu.
-func (e *engine) notification(prot core.Protection) string {
+func (e *engine) notification(prot core.Protection) core.Event {
+	now := e.d.Now()
 	if prot.Open {
-		e.notified = ""
-		return ""
+		e.closedSince = time.Time{}
+	} else if e.closedSince.IsZero() {
+		e.closedSince = now
 	}
-	text := "Защищённые приложения без сети: " + prot.Reason
-	if prot.Reason == "" || e.notifyOff || text == e.notified {
-		return ""
+	text := prot.AppsText()
+	if text == "" || text == e.notified || !prot.Open && now.Sub(e.closedSince) < e.d.NotifyAfter {
+		return core.Event{}
 	}
 	e.notified = text
-	return text
+	if e.notifyOff {
+		return core.Event{}
+	}
+	note := core.Event{Time: now, Kind: prot.Kind, Text: text}
+	if prot.Open {
+		note.IP, note.Country = prot.Exit.IP.String(), prot.Exit.Country
+	}
+	return note
+}
+
+// notifyDue отдаёт уведомление о закрытии, которое дождалось NotifyAfter: пока
+// оно длилось, правила могли больше не пересчитываться — сеть не менялась.
+func (e *engine) notifyDue() {
+	e.mu.Lock()
+	var note core.Event
+	if e.haveProt && !e.cleared {
+		note = e.notification(e.prot)
+	}
+	e.mu.Unlock()
+	e.notify(note)
+}
+
+// notify показывает уведомление (пустой текст — нечего) и раздаёт его
+// подписчикам канала службы.
+func (e *engine) notify(note core.Event) {
+	if note.Text == "" {
+		return
+	}
+	e.hub.publish(note)
+	if e.d.Notify != nil {
+		go func() {
+			if err := e.d.Notify.Notify(note.Text); err != nil {
+				e.d.Logf("%v", err)
+			}
+		}()
+	}
+}
+
+// protectionNow — защита сейчас: её показывает значок у часов.
+func (e *engine) protectionNow() ipc.Protection {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	p := ipc.Protection{NotifyOff: e.notifyOff}
+	switch {
+	case !e.haveProt:
+	case e.prot.Open:
+		p.Open, p.IP, p.Country = true, e.prot.Exit.IP.String(), e.prot.Exit.Country
+	default:
+		p.Reason = e.prot.Reason
+	}
+	return p
 }
 
 // setNotify включает или выключает уведомления. Журнал пишется всегда.

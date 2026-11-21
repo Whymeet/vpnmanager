@@ -299,7 +299,7 @@ func trayStartFile(L paths.Layout) []byte {
 	return fmt.Appendf(nil, `[Desktop Entry]
 Type=Application
 Name=vpnlock
-Comment=Значок службы vpnlock: есть значок — служба отвечает
+Comment=Значок службы vpnlock: в сети ли защищённые приложения
 Exec=%s tray
 NoDisplay=true
 Terminal=false

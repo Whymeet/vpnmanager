@@ -353,6 +353,18 @@ type Protection struct {
 	Kind       string      // KindOpen или KindClosed
 }
 
+// AppsText — защита словами для человека: так её называют уведомление и значок у
+// часов. Пусто — сервисы закрыты, а выход ещё проверяется.
+func (p Protection) AppsText() string {
+	switch {
+	case p.Open:
+		return fmt.Sprintf("Защищённые приложения в сети: выход %s, %s", p.Exit.IP, CountryName(p.Exit.Country))
+	case p.Reason != "":
+		return "Защищённые приложения без сети: " + p.Reason
+	}
+	return ""
+}
+
 // ProxyGate — решение о порте системного прокси. Закрытый порт закрыт для всех
 // программ: файрвол не различает, кто к нему подключается.
 type ProxyGate struct {

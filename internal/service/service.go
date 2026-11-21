@@ -63,7 +63,7 @@ type Deps struct {
 	Enforce      enforce.Enforcer   // правила файрвола
 	Upstreams    resolver.Upstreams // шифрованный и российский DNS для защищённых доменов
 	SystemDNS    SystemDNS          // кто направляет защищённые домены на резолвер службы
-	Notify       Notifier           // уведомления о закрытии сервисов
+	Notify       Notifier           // уведомления об открытии и закрытии сервисов
 	// Reach соединяется с to только через интерфейс via: так проверка
 	// убеждается, что мимо VPN до защищённого сервиса не достучаться.
 	Reach        func(ctx context.Context, via core.Tunnel, to netip.AddrPort) error
@@ -76,6 +76,7 @@ type Deps struct {
 	LearnFor     time.Duration                       // сколько приложение должно проработать при проверенном выходе
 	RemindEvery  time.Duration                       // как часто журнал напоминает о запущенном, но не обученном приложении
 	CheckEvery   time.Duration                       // как часто перепроверять выход
+	NotifyAfter  time.Duration                       // сколько закрытие длится, прежде чем о нём уведомить
 	ProbeEvery   time.Duration                       // как часто проверять «Россию напрямую» без событий сети
 	GuardEvery   time.Duration                       // как часто сторож сверяет правила файрвола
 	// Physical — физический интерфейс сейчас: через него зонд узнаёт домашний адрес.
@@ -238,11 +239,13 @@ func (s *service) handle(peer ipc.Peer, req ipc.Request, r *ipc.Reply) func() {
 		}
 		r.Send(ipc.Response{OK: true})
 		return nil
+	case ipc.CmdProtection:
+		r.Send(ipc.Response{OK: true, Protection: new(s.engine.protectionNow())})
+		return nil
 	case ipc.CmdNotify:
-		if refusal, ok := s.admin(peer); !ok {
-			r.Send(refusal)
-			return nil
-		}
+		// Уведомления включает и выключает любой: защиту они не меняют, а
+		// значок у часов работает от имени человека, без прав администратора
+		// (на Windows — без повышения).
 		if err := s.engine.setNotify(req.Notify); err != nil {
 			r.Send(ipc.Response{Code: ipc.CodeFailed, Error: err.Error()})
 			return nil
@@ -455,17 +458,17 @@ func (s *service) streamJournal(req ipc.Request, r *ipc.Reply) {
 	}
 }
 
-// streamNotifications шлёт уведомления о закрытии сервисов, пока клиент
-// слушает и служба работает. Читать их может любой пользователь: в них то же,
-// что в журнале.
+// streamNotifications шлёт уведомления об открытии и закрытии сервисов, пока
+// клиент слушает и служба работает. Читать их может любой пользователь: в них
+// то же, что в журнале.
 func (s *service) streamNotifications(r *ipc.Reply) {
 	notes, cancel := s.engine.hub.subscribe()
 	defer cancel()
 	gone := r.Stream()
 	for {
 		select {
-		case text := <-notes:
-			if r.Send(ipc.Response{OK: true, Event: &core.Event{Time: s.d.Now(), Kind: core.KindClosed, Text: text}}) != nil {
+		case note := <-notes:
+			if r.Send(ipc.Response{OK: true, Event: &note}) != nil {
 				return
 			}
 		case <-gone:

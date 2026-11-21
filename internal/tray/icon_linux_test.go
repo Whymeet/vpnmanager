@@ -3,11 +3,14 @@ package tray
 import (
 	"bufio"
 	"errors"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -45,6 +48,8 @@ func bus(t *testing.T) (address string, kill func()) {
 	}
 	return strings.TrimSpace(line), kill
 }
+
+var closedView = View{Title: "Приложения без сети", Detail: "VPN выключен", Notify: true}
 
 // session — сеанс с шиной и своим XDG_RUNTIME_DIR.
 func session(t *testing.T) (addr string, kill func()) {
@@ -117,7 +122,7 @@ func TestNoSessionWithoutBus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := icon.Show(); !errors.Is(err, ErrNoSession) {
+	if _, err := icon.Show(closedView, func() {}); !errors.Is(err, ErrNoSession) {
 		t.Fatalf("показ без шины: %v", err)
 	}
 }
@@ -130,7 +135,7 @@ func TestDeadBusEndsSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := icon.Show(); !errors.Is(err, ErrNoSession) {
+	if _, err := icon.Show(closedView, func() {}); !errors.Is(err, ErrNoSession) {
 		t.Fatalf("показ на мёртвой шине: %v", err)
 	}
 }
@@ -162,7 +167,7 @@ func TestRegistersWithHost(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := icon.Show(); err != nil {
+	if _, err := icon.Show(closedView, func() {}); err != nil {
 		t.Fatal(err)
 	}
 	defer icon.Hide()
@@ -183,7 +188,7 @@ func TestWaitsForHostAndFollowsItsRestart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := icon.Show(); err != nil {
+	if _, err := icon.Show(closedView, func() {}); err != nil {
 		t.Fatalf("без хоста: %v", err)
 	}
 	defer icon.Hide()
@@ -205,7 +210,7 @@ func TestPropertiesAsHostsReadThem(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := icon.Show(); err != nil {
+	if _, err := icon.Show(closedView, func() {}); err != nil {
 		t.Fatal(err)
 	}
 	defer icon.Hide()
@@ -234,8 +239,9 @@ func TestPropertiesAsHostsReadThem(t *testing.T) {
 	if props["Id"].Value() != "vpnlock" || props["Status"].Value() != "Active" || props["Category"].Value() != "SystemServices" {
 		t.Errorf("%v", props)
 	}
-	if props["ItemIsMenu"].Value() != false {
-		t.Error("значок объявлен меню")
+	// Значок — только меню: левый щелчок его открывает и в KDE, и в GNOME.
+	if props["ItemIsMenu"].Value() != true {
+		t.Error("значок не объявлен меню")
 	}
 	// Без Menu расширение GNOME считает значок неготовым, /NO_DBUSMENU для него то же.
 	if path, _ := props["Menu"].Value().(dbus.ObjectPath); path == "" || path == "/NO_DBUSMENU" {
@@ -256,61 +262,117 @@ func TestPropertiesAsHostsReadThem(t *testing.T) {
 		t.Errorf("альфа угла %d", px[0])
 	}
 	at := func(x, y int) []byte { return px[(y*64+x)*4 : (y*64+x)*4+4] }
-	if a := at(32, 28); a[0] != 255 || a[1] != 255 || a[2] != 255 || a[3] != 255 {
-		t.Errorf("скважина %v", a)
+	// Сервисы закрыты — перечёркнутый щит: черта красная, щит серый.
+	if a := at(32, 32); a[0] != 255 || a[1] < 180 || a[2] > 90 || a[3] > 90 {
+		t.Errorf("черта %v", a)
 	}
-	if a := at(14, 30); a[0] != 255 || a[2] <= a[1] || a[2] <= a[3] {
-		t.Errorf("щит не зелёный: %v", a)
+	if a := at(44, 22); a[0] != 255 || a[1] != a[2] || a[2] != a[3] {
+		t.Errorf("щит не серый: %v", a)
+	}
+	var tip toolTip
+	if err := dbus.Store([]any{props["ToolTip"].Value()}, &tip); err != nil {
+		t.Fatal(err)
+	}
+	if tip.Title != "vpnlock" || tip.Text != "Приложения без сети. VPN выключен" {
+		t.Errorf("подсказка %+v", tip)
 	}
 
+	// Без Activate в описании GNOME открывает меню левым щелчком сразу, а не ждёт
+	// двойного (indicatorStatusIcon.js).
 	var introspection string
 	if err := item.Call("org.freedesktop.DBus.Introspectable.Introspect", 0).Store(&introspection); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(introspection, itemIface) || !strings.Contains(introspection, "Activate") {
+	if !strings.Contains(introspection, itemIface) || strings.Contains(introspection, `"Activate"`) {
 		t.Errorf("описание объекта: %s", introspection)
-	}
-	if err := item.Call(itemIface+".Activate", 0, int32(1), int32(2)).Err; err != nil {
-		t.Errorf("Activate: %v", err)
 	}
 }
 
-// Меню есть только для хоста: пунктов в нём нет, поэтому щелчок ничего не открывает.
-func TestMenuIsEmpty(t *testing.T) {
+// shown — значок с хостом; toggles считает выборы «Уведомления».
+func shown(t *testing.T) (icon Icon, host *dbus.Conn, name string, toggles *int32) {
+	t.Helper()
 	addr, _ := session(t)
 	w, _ := startWatcher(t, addr)
 	icon, err := System()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := icon.Show(); err != nil {
+	toggles = new(int32)
+	if _, err := icon.Show(closedView, func() { atomic.AddInt32(toggles, 1) }); err != nil {
 		t.Fatal(err)
 	}
-	defer icon.Hide()
-	name := registered(t, w)
-
-	host, err := dbus.Connect(addr)
+	t.Cleanup(icon.Hide)
+	name = registered(t, w)
+	host, err = dbus.Connect(addr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer host.Close()
-	menu := host.Object(name, menuPath)
+	t.Cleanup(func() { host.Close() })
+	return icon, host, name, toggles
+}
+
+// layout — раскладка меню, как её спрашивает GNOME: только type и children-display.
+func layout(t *testing.T, menu dbus.BusObject) map[int32]map[string]any {
+	t.Helper()
 	call := menu.Call(menuIface+".GetLayout", 0, int32(0), int32(-1), []string{"type", "children-display"})
 	if call.Err != nil {
 		t.Fatal(call.Err)
 	}
 	var (
 		revision uint32
-		layout   menuNode
+		root     menuNode
 	)
-	if err := call.Store(&revision, &layout); err != nil {
+	if err := call.Store(&revision, &root); err != nil {
 		t.Fatal(err)
 	}
-	if layout.ID != 0 || len(layout.Children) != 0 {
-		t.Fatalf("меню не пустое: %+v", layout)
+	if root.ID != 0 || root.Props["children-display"].Value() != "submenu" {
+		t.Fatalf("корень %+v", root)
 	}
-	if err := menu.Call(menuIface+".GetGroupProperties", 0, []int32{0}, []string{}).Err; err != nil {
-		t.Error(err)
+	items := map[int32]map[string]any{}
+	var order []int32
+	for _, c := range root.Children {
+		var n menuNode
+		if err := dbus.Store([]any{c.Value()}, &n); err != nil {
+			t.Fatal(err)
+		}
+		props := map[string]any{}
+		for k, v := range n.Props {
+			props[k] = v.Value()
+		}
+		items[n.ID] = props
+		order = append(order, n.ID)
+	}
+	if len(order) != 4 {
+		t.Fatalf("пункты %v", order)
+	}
+	return items
+}
+
+// Меню: заголовок и строка под ним (не нажимаются), черта и «Уведомления» с отметкой. Подписи
+// приходят и в раскладке: GNOME спрашивает её только с type, но берёт всё, что в ней.
+func TestMenuAsHostsReadIt(t *testing.T) {
+	_, host, name, toggles := shown(t)
+	menu := host.Object(name, menuPath)
+	items := layout(t, menu)
+	if p := items[itemTitle]; p["label"] != closedView.Title || p["enabled"] != false {
+		t.Errorf("заголовок %v", p)
+	}
+	if p := items[itemDetail]; p["label"] != closedView.Detail || p["enabled"] != false || p["visible"] != true {
+		t.Errorf("строка под заголовком %v", p)
+	}
+	if p := items[itemLine]; p["type"] != "separator" {
+		t.Errorf("черта %v", p)
+	}
+	if p := items[itemNotify]; p["label"] != NotifyItem || p["toggle-type"] != "checkmark" || p["toggle-state"] != int32(1) {
+		t.Errorf("уведомления %v", p)
+	}
+
+	var props []menuProps
+	if err := menu.Call(menuIface+".GetGroupProperties", 0, []int32{itemNotify}, []string{"label"}).Store(&props); err != nil {
+		t.Fatal(err)
+	}
+	if len(props) != 1 || props[0].ID != itemNotify || len(props[0].Props) != 1 || props[0].Props["label"].Value() != NotifyItem {
+		t.Errorf("свойства %+v", props)
 	}
 	if err := menu.Call(menuIface+".AboutToShow", 0, int32(0)).Err; err != nil {
 		t.Error(err)
@@ -318,12 +380,82 @@ func TestMenuIsEmpty(t *testing.T) {
 	if err := menu.Call(menuIface+".Event", 0, int32(0), "opened", dbus.MakeVariant(""), uint32(0)).Err; err != nil {
 		t.Error(err)
 	}
+	if n := atomic.LoadInt32(toggles); n != 0 {
+		t.Fatalf("меню открыли — а уведомления переключились %d раз", n)
+	}
+	// Так щелчок шлёт GNOME (dbusMenu.js): «clicked» с числом 0.
+	if err := menu.Call(menuIface+".Event", 0, itemNotify, "clicked", dbus.MakeVariant(int32(0)), uint32(0)).Err; err != nil {
+		t.Fatal(err)
+	}
+	var missing []int32
+	err := menu.Call(menuIface+".EventGroup", 0, []menuEvent{{itemNotify, "clicked", dbus.MakeVariant(int32(0)), 0}, {42, "clicked", dbus.MakeVariant(int32(0)), 0}}).Store(&missing)
+	if err != nil || len(missing) != 1 || missing[0] != 42 {
+		t.Errorf("EventGroup: %v %v", missing, err)
+	}
+	if n := atomic.LoadInt32(toggles); n != 2 {
+		t.Fatalf("выбор «Уведомления» дошёл %d раз из 2", n)
+	}
 	var version dbus.Variant
 	if err := menu.Call("org.freedesktop.DBus.Properties.Get", 0, menuIface, "Version").Store(&version); err != nil {
 		t.Fatal(err)
 	}
 	if version.Value() != uint32(3) {
 		t.Errorf("Version = %v", version)
+	}
+}
+
+// Новый вид: картинка, подсказка и меню меняются, а хост узнаёт об этом сигналами
+// NewIcon, NewToolTip и ItemsPropertiesUpdated.
+func TestUpdateTellsTheHost(t *testing.T) {
+	icon, host, name, _ := shown(t)
+	signals := make(chan *dbus.Signal, 16)
+	host.Signal(signals)
+	if err := host.AddMatchSignal(dbus.WithMatchSender(name)); err != nil {
+		t.Fatal(err)
+	}
+	open := View{Open: true, Title: "Приложения в сети", Detail: "Выход 185.1.2.3, Германия", Notify: false}
+	icon.Update(open)
+	want := map[string]bool{itemIface + ".NewIcon": false, itemIface + ".NewToolTip": false, menuIface + ".ItemsPropertiesUpdated": false}
+	var updated []menuProps
+	for deadline := time.After(3 * time.Second); slices.Contains(slices.Collect(maps.Values(want)), false); {
+		select {
+		case sig := <-signals:
+			if _, ok := want[sig.Name]; ok {
+				want[sig.Name] = true
+			}
+			if sig.Name == menuIface+".ItemsPropertiesUpdated" {
+				if err := dbus.Store(sig.Body[:1], &updated); err != nil {
+					t.Fatal(err)
+				}
+			}
+		case <-deadline:
+			t.Fatalf("сигналы %v", want)
+		}
+	}
+	got := map[int32]map[string]dbus.Variant{}
+	for _, u := range updated {
+		got[u.ID] = u.Props
+	}
+	if got[itemTitle]["label"].Value() != open.Title || got[itemDetail]["label"].Value() != open.Detail || got[itemNotify]["toggle-state"].Value() != int32(0) {
+		t.Errorf("ItemsPropertiesUpdated %v", updated)
+	}
+
+	item := host.Object(name, itemPath)
+	var pixmaps []pixmap
+	v, err := item.GetProperty(itemIface + ".IconPixmap")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := dbus.Store([]any{v.Value()}, &pixmaps); err != nil {
+		t.Fatal(err)
+	}
+	// Открыто — зелёный щит, без черты.
+	if a := pixmaps[0].Pixels[(30*64+14)*4:][:4]; a[0] != 255 || a[2] <= a[1] || a[2] <= a[3] {
+		t.Errorf("щит не зелёный: %v", a)
+	}
+	items := layout(t, host.Object(name, menuPath))
+	if items[itemTitle]["label"] != open.Title || items[itemDetail]["label"] != open.Detail || items[itemNotify]["toggle-state"] != int32(0) {
+		t.Errorf("раскладка после смены %v", items)
 	}
 }
 
@@ -335,7 +467,7 @@ func TestHideDropsNameAndShowReturnsIt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := icon.Show(); err != nil {
+	if _, err := icon.Show(closedView, func() {}); err != nil {
 		t.Fatal(err)
 	}
 	name := registered(t, w)
@@ -347,7 +479,7 @@ func TestHideDropsNameAndShowReturnsIt(t *testing.T) {
 		}
 		time.Sleep(5 * time.Millisecond)
 	}
-	if _, err := icon.Show(); err != nil {
+	if _, err := icon.Show(closedView, func() {}); err != nil {
 		t.Fatal(err)
 	}
 	defer icon.Hide()
@@ -363,7 +495,7 @@ func TestLostBusEndsSession(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	died, err := icon.Show()
+	died, err := icon.Show(closedView, func() {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -378,7 +510,7 @@ func TestLostBusEndsSession(t *testing.T) {
 	}
 	if _, err := os.Stat(strings.TrimPrefix(os.Getenv("DBUS_SESSION_BUS_ADDRESS"), "unix:path=")); err == nil {
 		// Файл сокета может остаться, важно, что подключиться нельзя.
-		if _, err := icon.Show(); !errors.Is(err, ErrNoSession) {
+		if _, err := icon.Show(closedView, func() {}); !errors.Is(err, ErrNoSession) {
 			t.Fatalf("новый показ: %v", err)
 		}
 	}

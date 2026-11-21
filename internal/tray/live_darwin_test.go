@@ -9,14 +9,15 @@ import (
 	"unicode/utf8"
 )
 
-// На несколько секунд ставит значок в строку меню: tools/go test -tags live -v
-// ./internal/tray. Нужен графический сеанс, sudo не нужен.
+// На несколько секунд ставит значок в строку меню: сначала перечёркнутый щит, потом
+// щит с замком. tools/go test -tags live -v ./internal/tray. Нужен графический
+// сеанс, sudo не нужен.
 func TestLiveIconShowsAndHides(t *testing.T) {
 	icon, err := System()
 	if err != nil {
 		t.Fatal(err)
 	}
-	died, err := icon.Show()
+	died, err := icon.Show(View{Title: "Приложения без сети", Detail: "VPN выключен", Notify: true}, func() {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +25,13 @@ func TestLiveIconShowsAndHides(t *testing.T) {
 	select {
 	case err := <-died:
 		t.Fatalf("значок умер сразу: %v", err)
-	case <-time.After(3 * time.Second):
+	case <-time.After(2 * time.Second):
+	}
+	icon.Update(View{Open: true, Title: "Приложения в сети", Detail: "Выход 185.1.2.3, Германия"})
+	select {
+	case err := <-died:
+		t.Fatalf("значок умер после смены вида: %v", err)
+	case <-time.After(2 * time.Second):
 	}
 	if !utf8.ValidString(script) || !strings.Contains(script, "vpnlock") {
 		t.Fatal("скрипт испорчен")

@@ -38,7 +38,7 @@ func notifications(env Env, args []string) int {
 		} else {
 			items[1] += " — сейчас"
 		}
-		i, ok := choose(env, items, tui.Options{Title: "Уведомления о закрытии сервисов (журнал пишется всегда):"})
+		i, ok := choose(env, items, tui.Options{Title: "Уведомления об открытии и закрытии сервисов (журнал пишется всегда):"})
 		if !ok {
 			return 1
 		}

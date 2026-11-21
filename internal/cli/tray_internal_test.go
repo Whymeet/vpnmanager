@@ -19,15 +19,29 @@ import (
 
 // testIcon — показ значка в тесте; служба и сокет настоящие.
 type testIcon struct {
-	mu sync.Mutex
-	on bool
+	mu     sync.Mutex
+	on     bool
+	view   tray.View
+	toggle func()
 }
 
-func (i *testIcon) Show() (<-chan error, error) {
+func (i *testIcon) Show(v tray.View, toggle func()) (<-chan error, error) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-	i.on = true
+	i.on, i.view, i.toggle = true, v, toggle
 	return make(chan error, 1), nil
+}
+
+func (i *testIcon) Update(v tray.View) {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.view = v
+}
+
+func (i *testIcon) shownView() tray.View {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	return i.view
 }
 
 func (i *testIcon) Hide() {
@@ -64,9 +78,9 @@ func waitIcon(t *testing.T, i *testIcon, on bool, what string) {
 
 func fastTray(t *testing.T) {
 	t.Helper()
-	every, wait := trayEvery, trayWait
-	trayEvery, trayWait = 10*time.Millisecond, 50*time.Millisecond
-	t.Cleanup(func() { trayEvery, trayWait = every, wait })
+	every, wait, busy := trayEvery, trayWait, trayBusyWait
+	trayEvery, trayWait, trayBusyWait = 10*time.Millisecond, 50*time.Millisecond, 100*time.Millisecond
+	t.Cleanup(func() { trayEvery, trayWait, trayBusyWait = every, wait, busy })
 }
 
 // Значок за настоящей службой: появляется при её ответе, исчезает, когда она
@@ -123,7 +137,49 @@ func TestTrayFollowsRealService(t *testing.T) {
 	}
 }
 
+// Картинка и меню — защита настоящей службы; пункт «Уведомления» выключает их у
+// службы, хотя значок работает без прав администратора.
+func TestTrayShowsProtectionAndSwitchesNotifications(t *testing.T) {
+	fastTray(t)
+	s := servicetest.Start(t, "", servicetest.Fakes{Accounts: &servicetest.Accounts{Admin: false}})
+	icon := &testIcon{}
+	env := Env{Layout: s.Layout, Err: &bytes.Buffer{}, Tray: func() (tray.Icon, error) { return icon, nil }}
+	done := make(chan int, 1)
+	go func() { done <- trayCmd(env) }()
+	t.Cleanup(func() {
+		os.RemoveAll(s.Layout.AppDir) // значок выходит сам, когда vpnlock удалён
+		s.Stop()
+		<-done
+	})
+	waitView := func(want tray.View, what string) {
+		t.Helper()
+		for deadline := time.Now().Add(3 * time.Second); icon.shownView() != want; {
+			if time.Now().After(deadline) {
+				t.Fatalf("%s: показано %+v", what, icon.shownView())
+			}
+			time.Sleep(time.Millisecond)
+		}
+	}
+	waitView(tray.View{Title: "Приложения без сети", Detail: "VPN выключен", Notify: true}, "без VPN")
+
+	s.Web.Set("185.1.2.3", "DE", "DE")
+	s.Network.Set(servicetest.Tunnel("utun11", "10.8.0.2"))
+	online := tray.View{Open: true, Title: "Приложения в сети", Detail: "Выход 185.1.2.3, Германия", Notify: true}
+	waitView(online, "с VPN")
+
+	icon.mu.Lock()
+	toggle := icon.toggle
+	icon.mu.Unlock()
+	toggle()
+	online.Notify = false
+	waitView(online, "после выбора в меню")
+	if st := s.Status(t); !st.NotifyOff {
+		t.Fatalf("служба уведомления не выключила: %+v", st)
+	}
+}
+
 func TestTraySecondInstanceAndNoSessionLeaveQuietly(t *testing.T) {
+	fastTray(t)
 	for _, reason := range []error{tray.ErrBusy, tray.ErrNoSession} {
 		var errOut bytes.Buffer
 		env := Env{Err: &errOut, Tray: func() (tray.Icon, error) { return nil, reason }}
@@ -131,6 +187,28 @@ func TestTraySecondInstanceAndNoSessionLeaveQuietly(t *testing.T) {
 			t.Errorf("%v: код %d, вывод %q", reason, code, errOut.String())
 		}
 	}
+}
+
+// При обновлении прежний значок уходит не мгновенно: новый дожидается места.
+func TestTrayWaitsForThePreviousOneToLeave(t *testing.T) {
+	fastTray(t)
+	s := servicetest.Start(t, "", servicetest.Fakes{})
+	icon := &testIcon{}
+	tries := 0
+	env := Env{Layout: s.Layout, Err: &bytes.Buffer{}, Tray: func() (tray.Icon, error) {
+		if tries++; tries < 3 {
+			return nil, tray.ErrBusy
+		}
+		return icon, nil
+	}}
+	done := make(chan int, 1)
+	go func() { done <- trayCmd(env) }()
+	t.Cleanup(func() {
+		os.RemoveAll(s.Layout.AppDir)
+		s.Stop()
+		<-done
+	})
+	waitIcon(t, icon, true, "новый значок не дождался, пока уйдёт прежний")
 }
 
 func TestTrayNamesOtherFailure(t *testing.T) {

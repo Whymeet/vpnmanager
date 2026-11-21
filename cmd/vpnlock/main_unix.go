@@ -117,6 +117,7 @@ func daemon(L paths.Layout) int {
 		Reach:        exitcheck.Reach,
 		DNSAddr:      dnsAddr.String(),
 		CheckEvery:   checkEvery,
+		NotifyAfter:  notifyAfter,
 		ProbeEvery:   time.Minute,
 		GuardEvery:   time.Second,
 		Physical:     physicalTunnel,

@@ -129,13 +129,13 @@ func (in *Installer) installTasks(src string) string {
 // installNotifyTask: при входе любого пользователя в его сеансе запускается
 // агент уведомлений.
 func (in *Installer) installNotifyTask() string {
-	if err := createTask(paths.NotifyTask, userTaskXML(in.Layout.QuietExe, "notify-agent", "vpnlock: уведомления о закрытии защищённых сервисов")); err != nil {
+	if err := createTask(paths.NotifyTask, userTaskXML(in.Layout.QuietExe, "notify-agent", "vpnlock: уведомления об открытии и закрытии защищённых сервисов")); err != nil {
 		return fmt.Sprintf("Уведомления не поставлены: %v", err)
 	}
 	if schtasks("/Run", "/TN", paths.NotifyTask) != nil {
-		return "Уведомления о закрытии сервисов заработают после следующего входа в Windows."
+		return "Уведомления об открытии и закрытии сервисов заработают после следующего входа в Windows."
 	}
-	return "Уведомления о закрытии сервисов включены: их показывает задача vpnlock-notify при входе в Windows."
+	return "Уведомления об открытии и закрытии сервисов включены: их показывает задача vpnlock-notify при входе в Windows."
 }
 
 // trayPin — Windows 11 прячет новые значки, а закрепить значок программно штатного
@@ -148,10 +148,13 @@ func (in *Installer) installTrayTask() string {
 	if err := createTask(paths.TrayTask, userTaskXML(in.Layout.QuietExe, "tray", "vpnlock: значок службы рядом с часами")); err != nil {
 		return fmt.Sprintf("Значок не поставлен: %v. Защита работает и без него.", err)
 	}
+	// Прежний значок (при обновлении — прошлой версии) снимается: новый при живом
+	// старом молча выходит. Его не было — /End ответит ошибкой, это не беда.
+	schtasks("/End", "/TN", paths.TrayTask)
 	if schtasks("/Run", "/TN", paths.TrayTask) != nil {
 		return "Значок появится рядом с часами после следующего входа в Windows. " + trayPin
 	}
-	return "Значок vpnlock появился рядом с часами: есть значок — служба отвечает. " + trayPin
+	return "Значок vpnlock появился рядом с часами: щит — защищённые приложения в сети, перечёркнутый щит — без сети. По щелчку — что с защитой и выключатель уведомлений. " + trayPin
 }
 
 // installCatalogTask: раз в сутки и при входе того, кто ставит vpnlock, git

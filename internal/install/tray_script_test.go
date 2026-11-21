@@ -50,8 +50,10 @@ func newTrayStand(t *testing.T) *trayStand {
 			t.Fatal(err)
 		}
 	}
-	// setsid запускает значок: записываем, а не запускаем.
+	// setsid запускает значок, pkill снимает прежний: записываем, а не запускаем.
 	s.program("setsid", `echo "setsid $*" >>"$LOG"`)
+	s.program("pkill", `echo "pkill $*" >>"$LOG"`)
+	s.program("id", `echo 1000`)
 	s.program("sleep", `exit 0`)
 	s.host(false)
 	return s
@@ -138,6 +140,10 @@ func TestTrayStepSkipsWhenHostExists(t *testing.T) {
 	wantIn(t, out, "рядом с часами")
 	wantNot(t, calls, "apt-get")
 	wantIn(t, calls, "setsid /opt/vpnlock/bin/vpnlock tray")
+	// Прежний значок (до обновления) снят раньше, чем запущен новый, и только он.
+	if i := strings.Index(calls, "pkill -u 1000 -xf /opt/vpnlock/bin/vpnlock tray"); i < 0 || i > strings.Index(calls, "setsid") {
+		t.Errorf("прежний значок не снят перед запуском нового:\n%s", calls)
+	}
 }
 
 // Чистый GNOME: нужный пакет своим менеджером, UUID — тот, что лёг на диск.

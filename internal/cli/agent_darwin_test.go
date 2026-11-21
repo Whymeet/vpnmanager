@@ -32,7 +32,7 @@ func TestNotifyAgentShowsNotesAndLeavesWithTheTool(t *testing.T) {
 	s.Network.Set(servicetest.Tunnel("utun11", "10.8.0.2"))
 	s.WaitStatus(t, 2*time.Second, func(st ipc.Status) bool { return len(st.Paths) == 1 && st.Paths[0].State == "verified" })
 	s.Network.Set()
-	want := []string{"Защищённые приложения без сети: VPN выключен"}
+	want := []string{"Защищённые приложения в сети: выход 185.1.2.3, Германия", "Защищённые приложения без сети: VPN выключен"}
 	for deadline := time.Now().Add(2 * time.Second); ; {
 		mu.Lock()
 		got := slices.Clone(shown)

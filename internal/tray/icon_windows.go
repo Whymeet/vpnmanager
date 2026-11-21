@@ -6,6 +6,7 @@ import (
 	"runtime"
 	"sync"
 	"time"
+	"unicode/utf16"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
@@ -35,6 +36,12 @@ var (
 	procDestroyIcon            = user32.NewProc("DestroyIcon")
 	procGetSystemMetrics       = user32.NewProc("GetSystemMetrics")
 	procSetDpiAwarenessContext = user32.NewProc("SetProcessDpiAwarenessContext")
+	procCreatePopupMenu        = user32.NewProc("CreatePopupMenu")
+	procAppendMenuW            = user32.NewProc("AppendMenuW")
+	procTrackPopupMenu         = user32.NewProc("TrackPopupMenu")
+	procDestroyMenu            = user32.NewProc("DestroyMenu")
+	procSetForegroundWindow    = user32.NewProc("SetForegroundWindow")
+	procGetCursorPos           = user32.NewProc("GetCursorPos")
 	procCreateBitmap           = gdi32.NewProc("CreateBitmap")
 	procCreateDIBSection       = gdi32.NewProc("CreateDIBSection")
 	procDeleteObject           = gdi32.NewProc("DeleteObject")
@@ -42,14 +49,37 @@ var (
 )
 
 const (
-	wmDestroy = 0x0002
-	wmClose   = 0x0010
-	wmTimer   = 0x0113
+	wmNull      = 0x0000
+	wmDestroy   = 0x0002
+	wmClose     = 0x0010
+	wmTimer     = 0x0113
+	wmLButtonUp = 0x0202
+	wmRButtonUp = 0x0205
+	// Свои сообщения окна: щелчок по значку (его шлёт Explorer) и новый вид (его
+	// шлёт Update из потока цикла — значок меняется только на потоке окна).
+	wmTrayClick = 0x8000 + 1 // WM_APP+1
+	wmTrayView  = 0x8000 + 2
 
-	nimAdd    = 0
-	nimDelete = 2
-	nifIcon   = 0x2
-	nifTip    = 0x4
+	nimAdd     = 0
+	nimModify  = 1
+	nimDelete  = 2
+	nifMessage = 0x1
+	nifIcon    = 0x2
+	nifTip     = 0x4
+
+	mfString    = 0x0
+	mfGrayed    = 0x1
+	mfChecked   = 0x8
+	mfSeparator = 0x800
+
+	tpmRightButton = 0x2
+	tpmBottomAlign = 0x20
+	tpmNoNotify    = 0x80
+	tpmReturnCmd   = 0x100
+
+	menuTitle  = 1 // «Приложения в сети»: только для чтения
+	menuDetail = 2 // выход или причина: только для чтения
+	menuNotify = 3 // «Уведомления»
 
 	smCxSmIcon = 49 // SM_CXSMICON: размер значка в области уведомлений
 	dibRGB     = 0
@@ -115,6 +145,8 @@ type iconInfo struct {
 	Color    uintptr
 }
 
+type point struct{ X, Y int32 }
+
 type bitmapInfoHeader struct {
 	Size          uint32
 	Width         int32
@@ -141,6 +173,8 @@ var (
 	_ [32 - unsafe.Sizeof(iconInfo{})]byte
 	_ [unsafe.Sizeof(bitmapInfoHeader{}) - 40]byte
 	_ [40 - unsafe.Sizeof(bitmapInfoHeader{})]byte
+	_ [unsafe.Sizeof(point{}) - 8]byte
+	_ [8 - unsafe.Sizeof(point{})]byte
 )
 
 // shown — значок, который сейчас показан. Его трогает только поток окна: окно
@@ -156,9 +190,14 @@ var wndProc = sync.OnceValue(func() uintptr { return windows.NewCallback(windowP
 type notifyIcon struct {
 	wnd            uintptr
 	data           notifyIconData
+	icons          [2]uintptr // перечёркнутый щит и щит с замком: индекс — открыта ли защита
 	added          bool
 	taskbarCreated uint32
 	stopped        chan struct{}
+	toggle         func()
+
+	mu   sync.Mutex
+	view View // что показать: пишет Update, читает поток окна
 }
 
 // System — показ значка в этом сеансе.
@@ -178,7 +217,11 @@ func System() (Icon, error) {
 	return &notifyIcon{}, nil
 }
 
-func (n *notifyIcon) Show() (<-chan error, error) {
+func (n *notifyIcon) Show(v View, toggle func()) (<-chan error, error) {
+	n.mu.Lock()
+	n.view = v
+	n.mu.Unlock()
+	n.toggle = toggle
 	ready := make(chan error, 1)
 	died := make(chan error, 1)
 	n.stopped = make(chan struct{})
@@ -187,6 +230,14 @@ func (n *notifyIcon) Show() (<-chan error, error) {
 		return nil, err
 	}
 	return died, nil
+}
+
+// Update отдаёт новый вид потоку окна.
+func (n *notifyIcon) Update(v View) {
+	n.mu.Lock()
+	n.view = v
+	n.mu.Unlock()
+	procPostMessageW.Call(n.wnd, wmTrayView, 0, 0)
 }
 
 func (n *notifyIcon) Hide() {
@@ -207,13 +258,16 @@ func (n *notifyIcon) pump(ready, died chan<- error) {
 	if procSetDpiAwarenessContext.Find() == nil {
 		procSetDpiAwarenessContext.Call(perMonitorAwareV2)
 	}
-	hicon, err := createIcon()
-	if err != nil {
-		ready <- fmt.Errorf("значок: %w", err)
-		return
+	for i, open := range []bool{false, true} {
+		hicon, err := createIcon(open)
+		if err != nil {
+			ready <- fmt.Errorf("значок: %w", err)
+			return
+		}
+		defer procDestroyIcon.Call(hicon)
+		n.icons[i] = hicon
 	}
-	defer procDestroyIcon.Call(hicon)
-	if err := n.createWindow(hicon); err != nil {
+	if err := n.createWindow(); err != nil {
 		ready <- err
 		return
 	}
@@ -234,8 +288,9 @@ func (n *notifyIcon) pump(ready, died chan<- error) {
 }
 
 // createWindow заводит скрытое окно и добавляет значок. Окно обычное, а не
-// HWND_MESSAGE: сообщение TaskbarCreated рассылается только окнам верхнего уровня.
-func (n *notifyIcon) createWindow(hicon uintptr) error {
+// HWND_MESSAGE: сообщение TaskbarCreated рассылается только окнам верхнего уровня, а
+// меню без своего окна на переднем плане не закрывается щелчком мимо него.
+func (n *notifyIcon) createWindow() error {
 	var instance windows.Handle
 	if err := windows.GetModuleHandleEx(0, nil, &instance); err != nil {
 		return fmt.Errorf("значок: %w", err)
@@ -266,13 +321,9 @@ func (n *notifyIcon) createWindow(hicon uintptr) error {
 		return fmt.Errorf("окно значка: %w", err)
 	}
 	n.wnd = wnd
-	n.data = notifyIconData{Wnd: wnd, ID: iconID, Flags: nifIcon | nifTip, Icon: hicon}
+	n.data = notifyIconData{Wnd: wnd, ID: iconID, Flags: nifMessage | nifIcon | nifTip, CallbackMsg: wmTrayClick}
 	n.data.Size = uint32(unsafe.Sizeof(n.data))
-	tip, err := windows.UTF16FromString("vpnlock работает")
-	if err != nil {
-		return err
-	}
-	copy(n.data.Tip[:], tip)
+	n.setView()
 	// При входе в систему панели задач может ещё не быть: значок встанет по
 	// TaskbarCreated, а таймер — на случай, когда Explorer занят и не ответил.
 	n.add()
@@ -285,6 +336,61 @@ func (n *notifyIcon) add() {
 	n.added = r != 0
 }
 
+// setView переносит вид в данные значка: картинку и подсказку. Значок, который
+// встанет по TaskbarCreated, встанет уже с ним.
+func (n *notifyIcon) setView() View {
+	n.mu.Lock()
+	v := n.view
+	n.mu.Unlock()
+	n.data.Icon = n.icons[0]
+	if v.Open {
+		n.data.Icon = n.icons[1]
+	}
+	n.data.Tip = [128]uint16{}
+	copy(n.data.Tip[:len(n.data.Tip)-1], utf16Text(v.Tip()))
+	return v
+}
+
+// menu показывает меню у курсора и ждёт выбора: заголовок и строка под ним,
+// черта, «Уведомления» с отметкой. Переключателя в меню Windows нет.
+func (n *notifyIcon) menu() {
+	v := n.setView()
+	h, _, _ := procCreatePopupMenu.Call()
+	if h == 0 {
+		return
+	}
+	defer procDestroyMenu.Call(h)
+	title, item := utf16Text(v.Title+"\x00"), utf16Text(NotifyItem+"\x00")
+	procAppendMenuW.Call(h, mfString|mfGrayed, menuTitle, uintptr(unsafe.Pointer(&title[0])))
+	if v.Detail != "" {
+		detail := utf16Text(v.Detail + "\x00")
+		procAppendMenuW.Call(h, mfString|mfGrayed, menuDetail, uintptr(unsafe.Pointer(&detail[0])))
+	}
+	procAppendMenuW.Call(h, mfSeparator, 0, 0)
+	flags := uintptr(mfString)
+	if v.Notify {
+		flags |= mfChecked
+	}
+	procAppendMenuW.Call(h, flags, menuNotify, uintptr(unsafe.Pointer(&item[0])))
+	var pt point
+	procGetCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
+	// Окно значка — на передний план, а после меню — пустое сообщение: иначе меню не
+	// закрывается щелчком мимо него и открывается со второго раза.
+	procSetForegroundWindow.Call(n.wnd)
+	r, _, _ := procTrackPopupMenu.Call(h, tpmReturnCmd|tpmNoNotify|tpmRightButton|tpmBottomAlign,
+		uintptr(pt.X), uintptr(pt.Y), 0, n.wnd, 0)
+	procPostMessageW.Call(n.wnd, wmNull, 0, 0)
+	if uint32(r) == menuNotify && n.toggle != nil {
+		n.toggle()
+	}
+}
+
+// utf16Text — строка для Windows. Нулевой символ внутри (его в тексте службы не
+// бывает) обрезал бы строку, а не ломал вызов.
+func utf16Text(s string) []uint16 {
+	return utf16.Encode([]rune(s))
+}
+
 func windowProc(wnd, message, wParam, lParam uintptr) uintptr {
 	n := shown
 	if n != nil && n.wnd == wnd {
@@ -295,6 +401,19 @@ func windowProc(wnd, message, wParam, lParam uintptr) uintptr {
 		case wmTimer:
 			if !n.added {
 				n.add()
+			}
+			return 0
+		case wmTrayView:
+			n.setView()
+			if n.added {
+				procShellNotifyIconW.Call(nimModify, uintptr(unsafe.Pointer(&n.data)))
+			}
+			return 0
+		case wmTrayClick:
+			// Без NIM_SETVERSION Explorer шлёт само сообщение мыши в lParam.
+			switch uint32(lParam) {
+			case wmLButtonUp, wmRButtonUp:
+				n.menu()
 			}
 			return 0
 		case wmClose:
@@ -311,13 +430,14 @@ func windowProc(wnd, message, wParam, lParam uintptr) uintptr {
 	return r
 }
 
-// createIcon строит HICON из shield.png в размере области уведомлений.
-func createIcon() (uintptr, error) {
+// createIcon строит HICON из shield.png в размере области уведомлений: open — щит,
+// иначе — перечёркнутый щит.
+func createIcon(open bool) (uintptr, error) {
 	size, _, _ := procGetSystemMetrics.Call(smCxSmIcon)
 	if size == 0 {
 		size = 16
 	}
-	img := shield(int(size))
+	img := shield(int(size), open)
 
 	hdr := bitmapInfoHeader{Width: int32(size), Height: -int32(size), Planes: 1, BitCount: 32, Compression: dibRGB}
 	hdr.Size = uint32(unsafe.Sizeof(hdr))

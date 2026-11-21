@@ -45,7 +45,8 @@ vpnlock — служба для macOS и Windows: защищённые прил�
 - Клиент ↔ служба — unix-сокет `/var/run/vpnlock.sock` (`internal/ipc`): строка
   JSON туда, строка обратно (журнал — поток строк). Подключиться может любой
   пользователь; менять настройки — root или группа admin, uid служба узнаёт у ядра
-  (`LOCAL_PEERCRED`).
+  (`LOCAL_PEERCRED`). Исключение — уведомления (`CmdNotify`): их выключает и
+  значок у часов, а он работает без прав.
 - `internal/core` — ядро решений без обращений к ОС: пути через туннели, сведение
   двух источников проверки выхода (`Judge`), события журнала.
 - `internal/netwatch` — наблюдатель: routing-сокет ядра + снимок туннелей и
@@ -93,21 +94,36 @@ vpnlock — служба для macOS и Windows: защищённые прил�
   (`internal/browsers`: Chrome/Edge/Brave — `Local State`, режим `secure`;
   Firefox — `network.trr.mode` 2/3 или `doh-rollout.mode`). На шве `Reach`
   отвечает как pf с текущими правилами.
-- `internal/notify` — уведомление о закрытии сервисов вошедшему пользователю
-  (владелец `/dev/console`): `launchctl asuser <uid> sudo -u #<uid> osascript`,
-  текст — аргументом скрипта. Одно на закрытие: тот же текст не повторяется,
-  пока сервисы не открылись. Выключаются настройкой `notifyOff`
-  (`vpnlock notifications off`), журнал пишется всегда.
-- `internal/tray` — значок службы рядом с часами, только индикатор: есть значок —
-  служба отвечает. `vpnlock tray` — служебная команда, как `notify-agent`: цикл
-  (`tray.Loop`) раз в 5 с спрашивает `CmdStatus`, три неудачи подряд скрывают значок,
-  после удаления vpnlock значок выходит сам. Показ — шов `Icon`: на macOS дочерний
-  `osascript` (LaunchAgent `com.vpnlock.tray` без `AbandonProcessGroup`: launchd
-  снимает группу процессов; путь — из `Agent.Home`, формат `catalog-agent.json` не
-  менялся; новый значок macOS ставит левее всех, поэтому при первом запуске ему
-  задаётся `NSStatusItem Preferred Position` 0 — у часов), на Windows `Shell_NotifyIconW` на закреплённом потоке (задача
-  `vpnlock-tray`, мьютекс `Local\vpnlock-tray`, `TaskbarCreated`, окно обычное, не
-  `HWND_MESSAGE`), на Linux StatusNotifierItem (`_docs/linux.md`).
+- `internal/notify` — уведомление об открытии (адрес и страна выхода) и
+  закрытии (причина) сервисов вошедшему пользователю (владелец `/dev/console`):
+  `launchctl asuser <uid> sudo -u #<uid> osascript`, текст — аргументом
+  скрипта. Одно на событие (`engine.notification`): тот же текст подряд не
+  повторяется, смена выхода при открытых сервисах — новое событие. О закрытии —
+  только если оно длится дольше `Deps.NotifyAfter` (15 с; дождавшееся отдаёт тик
+  `notifyDue`): переподключение VPN проходит молча, и открытие после него тем же
+  выходом тоже. Выключаются настройкой `notifyOff` (`vpnlock notifications off`
+  или меню значка — `CmdNotify` принимается от любого пользователя), журнал
+  пишется всегда.
+- `internal/tray` — значок службы рядом с часами: есть значок — служба отвечает;
+  картинка — защита (щит с замком — в сети, перечёркнутый — без сети); по щелчку
+  узкое меню — заголовок, строка под ним (выход или причина), «Уведомления»
+  (переключатель на macOS, отметка на Windows и Linux). `vpnlock tray` — служебная
+  команда, как `notify-agent`: цикл (`tray.Loop`) раз в 2 с спрашивает
+  `CmdProtection` (`ipc.Protection` — части: адрес, страна, причина), новый ответ —
+  `Icon.Update`; пункт меню — `CmdNotify` и `Update` даже с тем же видом. Три неудачи
+  подряд скрывают значок, после удаления vpnlock значок выходит сам, занятое место
+  новый экземпляр ждёт до 5 с (обновление снимает старый). Перечёркнутый щит для
+  Windows и Linux строится из `shield.png` в коде. Показ — шов `Icon`: на macOS
+  дочерний `osascript` (`app.run`; меню 220 pt из своих видов с `NSSwitch`; вид —
+  строки JSON из ASCII в stdin, переключатель — `toggle` в stdout, конец stdin —
+  выход; LaunchAgent `com.vpnlock.tray` без
+  `AbandonProcessGroup`: launchd снимает группу процессов; путь — из `Agent.Home`,
+  формат `catalog-agent.json` не менялся; новый значок macOS ставит левее всех,
+  поэтому при первом запуске ему задаётся `NSStatusItem Preferred Position` 0 — у
+  часов), на Windows `Shell_NotifyIconW` на закреплённом потоке (задача
+  `vpnlock-tray`, установка делает `/End` перед `/Run`, мьютекс `Local\vpnlock-tray`,
+  `TaskbarCreated`, окно обычное, не `HWND_MESSAGE`, меню — `TrackPopupMenu`), на
+  Linux StatusNotifierItem с dbusmenu (`_docs/linux.md`).
 - Зонд «Россия напрямую» (`exitcheck.Probe`): Яндекс (ipv4-internet.yandex.net,
   запасной yandex.ru/internet) спрашивается через туннель и через физический
   интерфейс; одинаковый ответ — клиент VPN шлёт российское мимо туннеля. Зонд

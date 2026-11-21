@@ -34,8 +34,9 @@ const (
 	CmdNotify        = "notify"         // включить или выключить уведомления
 	CmdCheck         = "check"          // проверка: правила, выход, сервисы мимо VPN
 	CmdSync          = "sync"           // итог ежедневного обновления каталога из клона
-	// CmdNotifications — поток уведомлений о закрытии сервисов: на Windows их
-	// показывает задача в сеансе пользователя.
+	CmdProtection    = "protection"     // открыта ли защита сейчас: для значка у часов
+	// CmdNotifications — поток уведомлений об открытии и закрытии сервисов: на
+	// Windows их показывает задача в сеансе пользователя.
 	CmdNotifications = "notifications"
 	CmdUninstall     = "uninstall"
 )
@@ -107,6 +108,18 @@ type Response struct {
 	Forgotten []string `json:"forgotten,omitempty"`
 	// Для check — пункты проверки.
 	Check []CheckItem `json:"check,omitempty"`
+	// Для protection — защита сейчас.
+	Protection *Protection `json:"protection,omitempty"`
+}
+
+// Protection — защита сейчас: что показывает значок рядом с часами. Части, а не
+// готовая фраза: меню значка коротким заголовком и строкой под ним.
+type Protection struct {
+	Open      bool   `json:"open"`                // защищённые приложения в сети
+	IP        string `json:"ip,omitempty"`        // выход, которым открыто
+	Country   string `json:"country,omitempty"`   // его страна, код
+	Reason    string `json:"reason,omitempty"`    // почему закрыто; пусто — выход проверяется
+	NotifyOff bool   `json:"notifyOff,omitempty"` // уведомления выключены
 }
 
 // Итог пункта проверки.

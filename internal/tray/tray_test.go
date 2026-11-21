@@ -3,10 +3,14 @@ package tray
 import (
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"vpnlock/internal/ipc"
 )
 
 const tick = 5 * time.Millisecond
@@ -17,12 +21,14 @@ type fakeIcon struct {
 	on      bool
 	shows   int
 	hides   int
+	views   []View // что показывалось: при показе и при каждой смене
+	toggle  func()
 	showErr error
 	dies    error // показ встаёт и тут же падает
 	died    chan error
 }
 
-func (f *fakeIcon) Show() (<-chan error, error) {
+func (f *fakeIcon) Show(v View, toggle func()) (<-chan error, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.shows++
@@ -34,8 +40,29 @@ func (f *fakeIcon) Show() (<-chan error, error) {
 		f.died <- f.dies
 		return f.died, nil
 	}
-	f.on = true
+	f.on, f.toggle = true, toggle
+	f.views = append(f.views, v)
 	return f.died, nil
+}
+
+func (f *fakeIcon) Update(v View) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.views = append(f.views, v)
+}
+
+// click — человек выбрал в меню «Уведомления».
+func (f *fakeIcon) click() {
+	f.mu.Lock()
+	toggle := f.toggle
+	f.mu.Unlock()
+	toggle()
+}
+
+func (f *fakeIcon) shownViews() []View {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.views)
 }
 
 func (f *fakeIcon) Hide() {
@@ -63,13 +90,17 @@ func (f *fakeIcon) state() (on bool, shows, hides int) {
 type stand struct {
 	mu        sync.Mutex
 	alive     bool
+	prot      ipc.Protection // что служба говорит о защите
 	polls     int
+	switches  []bool // что значок просил сделать с уведомлениями
 	installed bool
 	icon      *fakeIcon
 	logs      []string
 	done      chan struct{}
 	stop      context.CancelFunc
 }
+
+var errDown = errors.New("служба не отвечает")
 
 func start(t *testing.T, s *stand) *stand {
 	t.Helper()
@@ -84,11 +115,21 @@ func start(t *testing.T, s *stand) *stand {
 		defer close(s.done)
 		Loop{
 			Icon: s.icon,
-			Alive: func() bool {
+			State: func() (ipc.Protection, error) {
 				s.mu.Lock()
 				defer s.mu.Unlock()
 				s.polls++
-				return s.alive
+				if !s.alive {
+					return ipc.Protection{}, errDown
+				}
+				return s.prot, nil
+			},
+			SetNotify: func(on bool) error {
+				s.mu.Lock()
+				defer s.mu.Unlock()
+				s.switches = append(s.switches, on)
+				s.prot.NotifyOff = !on
+				return nil
 			},
 			Installed: func() bool {
 				s.mu.Lock()
@@ -172,17 +213,20 @@ func TestIconHidesAfterThreeFailuresInARow(t *testing.T) {
 		defer close(done)
 		Loop{
 			Icon: icon,
-			Alive: func() bool {
+			State: func() (ipc.Protection, error) {
 				mu.Lock()
 				defer mu.Unlock()
 				on, _, _ := icon.state()
 				seen = append(seen, on) // каким значок был перед этим опросом
 				if at == len(replies) {
 					cancel()
-					return false
+					return ipc.Protection{}, errDown
 				}
 				at++
-				return replies[at-1]
+				if !replies[at-1] {
+					return ipc.Protection{}, errDown
+				}
+				return ipc.Protection{Open: true, IP: "185.1.2.3", Country: "DE"}, nil
 			},
 			Installed: func() bool { return true },
 			Every:     tick,
@@ -301,9 +345,116 @@ func TestLoopLeavesWhenSessionEnds(t *testing.T) {
 	}
 }
 
+// Картинка и меню следуют за защитой: смена — одно обновление, тот же ответ
+// службы значок не трогает.
+func TestIconFollowsProtection(t *testing.T) {
+	s := start(t, &stand{alive: true, prot: ipc.Protection{Reason: "VPN выключен"}})
+	eventually(t, "значок не появился", func() bool { on, _, _ := s.icon.state(); return on })
+	s.waitPolls(3)
+	want := []View{{Title: "Приложения без сети", Detail: "VPN выключен", Notify: true}}
+	if got := s.icon.shownViews(); !slices.Equal(got, want) {
+		t.Fatalf("показано %+v", got)
+	}
+
+	s.mu.Lock()
+	s.prot = ipc.Protection{Open: true, IP: "185.1.2.3", Country: "DE"}
+	s.mu.Unlock()
+	want = append(want, View{Open: true, Title: "Приложения в сети", Detail: "Выход 185.1.2.3, Германия", Notify: true})
+	eventually(t, "картинка не сменилась", func() bool { return len(s.icon.shownViews()) == 2 })
+	s.waitPolls(3)
+	if got := s.icon.shownViews(); !slices.Equal(got, want) {
+		t.Fatalf("показано %+v", got)
+	}
+}
+
+// Пункт меню «Уведомления» выключает их и включает снова; отметка — то, что
+// запомнила служба.
+func TestMenuSwitchesNotifications(t *testing.T) {
+	s := start(t, &stand{alive: true, prot: ipc.Protection{Open: true, IP: "185.1.2.3", Country: "DE"}})
+	eventually(t, "значок не появился", func() bool { on, _, _ := s.icon.state(); return on })
+	last := func() View { v := s.icon.shownViews(); return v[len(v)-1] }
+	if !last().Notify {
+		t.Fatal("уведомления включены, а отметки нет")
+	}
+	s.icon.click()
+	eventually(t, "отметка не снялась", func() bool { return !last().Notify })
+	s.icon.click()
+	eventually(t, "отметка не вернулась", func() bool { return last().Notify })
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !slices.Equal(s.switches, []bool{false, true}) {
+		t.Fatalf("службу просили %v", s.switches)
+	}
+}
+
+// Служба не приняла выбор в меню: причина — в журнал значка, значок живёт дальше.
+func TestMenuSwitchFailureIsReported(t *testing.T) {
+	icon := &fakeIcon{}
+	var mu sync.Mutex
+	var logs []string
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		Loop{
+			Icon:      icon,
+			State:     func() (ipc.Protection, error) { return ipc.Protection{Reason: "VPN выключен"}, nil },
+			SetNotify: func(bool) error { return errors.New("служба отказала") },
+			Installed: func() bool { return true },
+			Every:     tick,
+			Logf: func(format string, args ...any) {
+				mu.Lock()
+				defer mu.Unlock()
+				logs = append(logs, fmt.Sprintf(format, args...))
+			},
+		}.Run(ctx)
+	}()
+	defer func() { cancel(); <-done }()
+	eventually(t, "значок не появился", func() bool { on, _, _ := icon.state(); return on })
+	icon.click()
+	eventually(t, "причина не записана", func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return slices.Contains(logs, "значок: уведомления: служба отказала")
+	})
+	if on, _, _ := icon.state(); !on {
+		t.Fatal("значок скрылся из-за отказа")
+	}
+	// Переключатель на macOS перещёлкнулся сам: тот же вид отдаётся заново, и он
+	// возвращается туда, где его держит служба.
+	eventually(t, "вид после отказа не отдан заново", func() bool { return len(icon.shownViews()) >= 2 })
+	for _, v := range icon.shownViews() {
+		if !v.Notify {
+			t.Fatalf("уведомления выключены, хотя служба отказала: %+v", v)
+		}
+	}
+}
+
+// Меню короткое: заголовок и строка под ним. Причина — с большой буквы: в журнале
+// она шла после двоеточия.
+func TestViewIsShort(t *testing.T) {
+	for _, tt := range []struct {
+		p    ipc.Protection
+		want View
+	}{
+		{ipc.Protection{Open: true, IP: "185.1.2.3", Country: "DE"}, View{Open: true, Title: "Приложения в сети", Detail: "Выход 185.1.2.3, Германия", Notify: true}},
+		{ipc.Protection{Reason: "выход в России (95.1.2.3)", NotifyOff: true}, View{Title: "Приложения без сети", Detail: "Выход в России (95.1.2.3)"}},
+		{ipc.Protection{Reason: "VPN выключен"}, View{Title: "Приложения без сети", Detail: "VPN выключен", Notify: true}},
+		{ipc.Protection{}, View{Title: "Приложения без сети", Detail: "Проверяю выход…", Notify: true}},
+		{ipc.Protection{Open: true}, View{Open: true, Title: "vpnlock работает", Notify: true}}, // служба старше значка
+	} {
+		if got := view(tt.p); got != tt.want {
+			t.Errorf("%+v: %+v, ждали %+v", tt.p, got, tt.want)
+		}
+	}
+	if tip := view(ipc.Protection{Reason: "VPN выключен"}).Tip(); tip != "vpnlock\nПриложения без сети\nVPN выключен" {
+		t.Errorf("подсказка %q", tip)
+	}
+}
+
 func TestShieldIsReadableOnAnyPanel(t *testing.T) {
 	for _, size := range []int{16, 20, 24, 32, 64} {
-		img := shield(size)
+		img := shield(size, true)
 		if img.Bounds().Dx() != size || img.Bounds().Dy() != size {
 			t.Fatalf("%d: %v", size, img.Bounds())
 		}
@@ -334,5 +485,38 @@ func TestShieldIsReadableOnAnyPanel(t *testing.T) {
 	}
 	if !strings.HasPrefix(string(shieldPNG), "\x89PNG") {
 		t.Fatal("shield.png — не PNG")
+	}
+}
+
+// Закрытый щит отличается от открытого и цветом, и формой: зелёного нет, по
+// диагонали — красная черта с прозрачным зазором.
+func TestCrossedShieldDiffersByColorAndShape(t *testing.T) {
+	for _, size := range []int{16, 20, 24, 32, 64} {
+		img := shield(size, false)
+		if img.NRGBAAt(0, 0).A != 0 {
+			t.Errorf("%d: угол не прозрачный", size)
+		}
+		var red, green, grey int
+		for y := range size {
+			for x := range size {
+				c := img.NRGBAAt(x, y)
+				switch {
+				case c.A < 200:
+				case c.R > 180 && c.G < 90 && c.B < 90:
+					red++
+				case int(c.G) > int(c.R)+40 && int(c.G) > int(c.B)+40:
+					green++
+				case c.R == c.G && c.G == c.B:
+					grey++
+				}
+			}
+		}
+		if red == 0 || green != 0 || grey == 0 {
+			t.Errorf("%d: красных %d, зелёных %d, серых %d", size, red, green, grey)
+		}
+		// Середина черты — красная: черта идёт через центр щита.
+		if c := img.NRGBAAt(size/2, size/2); c.R < 180 || c.A < 200 {
+			t.Errorf("%d: в центре %v", size, c)
+		}
 	}
 }

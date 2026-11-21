@@ -216,6 +216,7 @@ func deps(L paths.Layout, logf func(format string, args ...any)) service.Deps {
 		Reach:        exitcheck.Reach,
 		DNSAddr:      dnsAddr.String(),
 		CheckEvery:   checkEvery,
+		NotifyAfter:  notifyAfter,
 		ProbeEvery:   time.Minute,
 		GuardEvery:   time.Second,
 		Physical:     physicalTunnel,
