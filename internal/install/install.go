@@ -1,4 +1,4 @@
-// Package install — установка и снятие vpnlock: файлы, команда в PATH, служба
+// Package install — установка и снятие appguard: файлы, команда в PATH, служба
 // системы (launchd на macOS, диспетчер служб на Windows).
 package install
 
@@ -11,8 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"vpnlock/internal/catalog"
-	"vpnlock/internal/core"
+	"appguard/internal/catalog"
+	"appguard/internal/core"
 )
 
 // installCatalog кладёт службе каталог из клона (catalog/catalog.json рядом с
@@ -29,7 +29,7 @@ func (in *Installer) installCatalog(src string) (string, error) {
 	}
 	c, _, err := catalog.Parse(data)
 	if errors.Is(err, catalog.ErrNewer) {
-		return "Каталог в клоне новее этой версии vpnlock и не установлен — обнови инструмент.", nil
+		return "Каталог в клоне новее этой версии appguard и не установлен — обнови инструмент.", nil
 	}
 	if err != nil {
 		return fmt.Sprintf("Каталог в клоне повреждён и не установлен: %v", err), nil
@@ -40,7 +40,7 @@ func (in *Installer) installCatalog(src string) (string, error) {
 	return fmt.Sprintf("Каталог установлен: %d %s.", len(c.Apps), core.Plural(len(c.Apps), "приложение", "приложения", "приложений")), nil
 }
 
-// rememberClone записывает, из какого клона поставлен vpnlock: `vpnlock update`
+// rememberClone записывает, из какого клона поставлен appguard: `appguard update`
 // пересобирает его оттуда. Если ставят установленной командой (src лежит в
 // папке установки), клона рядом нет и запись остаётся прежней.
 func (in *Installer) rememberClone(src string) error {
@@ -51,7 +51,7 @@ func (in *Installer) rememberClone(src string) error {
 	return writeFile(in.Layout.CloneFile, []byte(clone), 0o644)
 }
 
-// IsClone — в папке клон репозитория vpnlock: модуль vpnlock и папка setup.
+// IsClone — в папке клон репозитория appguard: модуль appguard и папка setup.
 // Git для Windows по умолчанию (core.autocrlf) кладёт файлы с CRLF — первая
 // строка go.mod сверяется без \r.
 func IsClone(dir string) bool {
@@ -59,7 +59,7 @@ func IsClone(dir string) bool {
 	if err != nil {
 		return false
 	}
-	if first, _, _ := strings.Cut(string(data), "\n"); strings.TrimSuffix(first, "\r") != "module vpnlock" {
+	if first, _, _ := strings.Cut(string(data), "\n"); strings.TrimSuffix(first, "\r") != "module appguard" {
 		return false
 	}
 	fi, err := os.Stat(filepath.Join(dir, "setup"))

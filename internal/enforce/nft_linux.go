@@ -16,13 +16,13 @@ import (
 	"strings"
 	"sync"
 
-	"vpnlock/internal/procs"
+	"appguard/internal/procs"
 )
 
-// Table — таблица vpnlock в nftables. Своя таблица не трогает чужие правила и
+// Table — таблица appguard в nftables. Своя таблица не трогает чужие правила и
 // правила дистрибутива, а пакет проходит базовые цепочки всех таблиц: разрешение
 // здесь не отменяет чужой запрет, запрет здесь окончательный.
-const Table = "vpnlock"
+const Table = "appguard"
 
 // resolvConf — откуда видно, какими серверами DNS пользуются программы.
 const resolvConf = "/etc/resolv.conf"

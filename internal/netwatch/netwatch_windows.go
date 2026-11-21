@@ -13,7 +13,7 @@ import (
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/registry"
 
-	"vpnlock/internal/core"
+	"appguard/internal/core"
 )
 
 // proxyPoll — как часто наблюдатель перечитывает системный прокси: о его смене

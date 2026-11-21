@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/cli"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/paths"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/cli"
+	"appguard/internal/ipc"
+	"appguard/internal/paths"
+	"appguard/internal/service/servicetest"
 )
 
 // Ежедневное обновление каталога (таска 13) с настоящим git: репозиторий
@@ -72,7 +72,7 @@ func syncEnv(t *testing.T, clone string) (*servicetest.Service, cli.Env) {
 func TestDailySyncBringsTheNewCatalog(t *testing.T) {
 	clone, publish := course(t)
 	s, env := syncEnv(t, clone)
-	if r := vpnlock(env, "", "catalog", "sync", clone); r.code != 0 {
+	if r := appguard(env, "", "catalog", "sync", clone); r.code != 0 {
 		t.Fatalf("%+v", r)
 	}
 	if st := s.Status(t); st.Catalog != "2026-10-01" {
@@ -81,13 +81,13 @@ func TestDailySyncBringsTheNewCatalog(t *testing.T) {
 
 	// Автор опубликовал новый каталог — назавтра он у ученика.
 	publish("catalog/catalog.json", catalogJSON("2026-10-08"))
-	if r := vpnlock(env, "", "catalog", "sync", clone); r.code != 0 {
+	if r := appguard(env, "", "catalog", "sync", clone); r.code != 0 {
 		t.Fatalf("%+v", r)
 	}
 	if st := s.Status(t); st.Catalog != "2026-10-08" || st.SyncProblem != "" {
 		t.Fatalf("каталог: %+v", st)
 	}
-	if r := vpnlock(env, "", "status"); !strings.Contains(r.out, "Каталог: от 08.10.2026") {
+	if r := appguard(env, "", "status"); !strings.Contains(r.out, "Каталог: от 08.10.2026") {
 		t.Fatalf("статус: %s", r.out)
 	}
 }
@@ -95,7 +95,7 @@ func TestDailySyncBringsTheNewCatalog(t *testing.T) {
 func TestDivergedCloneChangesNothing(t *testing.T) {
 	clone, publish := course(t)
 	s, env := syncEnv(t, clone)
-	vpnlock(env, "", "catalog", "sync", clone)
+	appguard(env, "", "catalog", "sync", clone)
 
 	// Ученик закоммитил своё, автор — своё: история разошлась.
 	os.WriteFile(filepath.Join(clone, "notes.txt"), []byte("моё"), 0o644)
@@ -104,7 +104,7 @@ func TestDivergedCloneChangesNothing(t *testing.T) {
 	head := git(t, clone, "rev-parse", "HEAD")
 	publish("catalog/catalog.json", catalogJSON("2026-10-08"))
 
-	r := vpnlock(env, "", "catalog", "sync", clone)
+	r := appguard(env, "", "catalog", "sync", clone)
 	if r.code != 1 || !strings.Contains(r.out, "история клона разошлась") {
 		t.Fatalf("%+v", r)
 	}
@@ -125,7 +125,7 @@ func TestLocalChangesAreLeftAlone(t *testing.T) {
 	os.WriteFile(filepath.Join(clone, "catalog/catalog.json"), []byte(mine), 0o644)
 	publish("catalog/catalog.json", catalogJSON("2026-10-08"))
 
-	r := vpnlock(env, "", "catalog", "sync", clone)
+	r := appguard(env, "", "catalog", "sync", clone)
 	if r.code != 1 || !strings.Contains(r.out, "в клоне правки в файлах, которые меняет обновление") {
 		t.Fatalf("%+v", r)
 	}
@@ -137,10 +137,10 @@ func TestLocalChangesAreLeftAlone(t *testing.T) {
 func TestUnreachableOrMissingClone(t *testing.T) {
 	clone, _ := course(t)
 	s, env := syncEnv(t, clone)
-	vpnlock(env, "", "catalog", "sync", clone)
+	appguard(env, "", "catalog", "sync", clone)
 
 	git(t, clone, "remote", "set-url", "origin", filepath.Join(t.TempDir(), "gone.git"))
-	if r := vpnlock(env, "", "catalog", "sync", clone); r.code != 1 || !strings.Contains(r.out, "не удалось связаться с репозиторием") {
+	if r := appguard(env, "", "catalog", "sync", clone); r.code != 1 || !strings.Contains(r.out, "не удалось связаться с репозиторием") {
 		t.Fatalf("%+v", r)
 	}
 	if st := s.Status(t); st.Catalog != "2026-10-01" {
@@ -149,7 +149,7 @@ func TestUnreachableOrMissingClone(t *testing.T) {
 
 	moved := clone + "-moved"
 	os.Rename(clone, moved)
-	if r := vpnlock(env, "", "catalog", "sync", clone); r.code != 1 || !strings.Contains(r.out, "не найден — перемещён или удалён") {
+	if r := appguard(env, "", "catalog", "sync", clone); r.code != 1 || !strings.Contains(r.out, "не найден — перемещён или удалён") {
 		t.Fatalf("%+v", r)
 	}
 	hasJournal(t, s, "каталог не обновился: клон "+clone+" не найден — перемещён или удалён")
@@ -159,12 +159,12 @@ func TestNewVersionInTheCloneIsReminded(t *testing.T) {
 	clone, publish := course(t)
 	s, env := syncEnv(t, clone)
 	publish("internal/version/VERSION", "10.0.0\n")
-	vpnlock(env, "", "catalog", "sync", clone)
+	appguard(env, "", "catalog", "sync", clone)
 	if st := s.Status(t); st.NewVersion != "10.0.0" {
 		t.Fatalf("статус: %+v", st)
 	}
-	hasJournal(t, s, "в клоне новая версия vpnlock 10.0.0 (работает "+servicetest.Version+")")
-	if r := vpnlock(env, "", "status"); !strings.Contains(r.out, "Новая версия: в клоне 10.0.0") {
+	hasJournal(t, s, "в клоне новая версия appguard 10.0.0 (работает "+servicetest.Version+")")
+	if r := appguard(env, "", "status"); !strings.Contains(r.out, "Новая версия: в клоне 10.0.0") {
 		t.Fatalf("статус: %s", r.out)
 	}
 }

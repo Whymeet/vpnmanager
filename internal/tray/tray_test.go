@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/ipc"
+	"appguard/internal/ipc"
 )
 
 const tick = 5 * time.Millisecond
@@ -295,7 +295,7 @@ func TestBrokenIconDoesNotSpin(t *testing.T) {
 	}
 }
 
-func TestLoopLeavesWhenVpnlockIsRemoved(t *testing.T) {
+func TestLoopLeavesWhenAppguardIsRemoved(t *testing.T) {
 	s := start(t, &stand{alive: true})
 	eventually(t, "значок не появился", func() bool { on, _, _ := s.icon.state(); return on })
 	s.mu.Lock()
@@ -441,13 +441,13 @@ func TestViewIsShort(t *testing.T) {
 		{ipc.Protection{Reason: "выход в России (95.1.2.3)", NotifyOff: true}, View{Title: "Приложения без сети", Detail: "Выход в России (95.1.2.3)"}},
 		{ipc.Protection{Reason: "VPN выключен"}, View{Title: "Приложения без сети", Detail: "VPN выключен", Notify: true}},
 		{ipc.Protection{}, View{Title: "Приложения без сети", Detail: "Проверяю выход…", Notify: true}},
-		{ipc.Protection{Open: true}, View{Open: true, Title: "vpnlock работает", Notify: true}}, // служба старше значка
+		{ipc.Protection{Open: true}, View{Open: true, Title: "appguard работает", Notify: true}}, // служба старше значка
 	} {
 		if got := view(tt.p); got != tt.want {
 			t.Errorf("%+v: %+v, ждали %+v", tt.p, got, tt.want)
 		}
 	}
-	if tip := view(ipc.Protection{Reason: "VPN выключен"}).Tip(); tip != "vpnlock\nПриложения без сети\nVPN выключен" {
+	if tip := view(ipc.Protection{Reason: "VPN выключен"}).Tip(); tip != "appguard\nПриложения без сети\nVPN выключен" {
 		t.Errorf("подсказка %q", tip)
 	}
 }

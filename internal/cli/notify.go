@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/tui"
+	"appguard/internal/ipc"
+	"appguard/internal/tui"
 )
 
-// notifications — `vpnlock notifications [on|off]`: без аргумента в меню —
+// notifications — `appguard notifications [on|off]`: без аргумента в меню —
 // выбор, в команде — что сейчас.
 func notifications(env Env, args []string) int {
 	st, ok := currentStatus(env)
@@ -25,7 +25,7 @@ func notifications(env Env, args []string) int {
 		case "off":
 			want = false
 		default:
-			fmt.Fprintf(env.Err, "Нет такого: vpnlock notifications on — включить, vpnlock notifications off — выключить.\n")
+			fmt.Fprintf(env.Err, "Нет такого: appguard notifications on — включить, appguard notifications off — выключить.\n")
 			return 2
 		}
 	case len(args) > 1:
@@ -59,7 +59,7 @@ func notifications(env Env, args []string) int {
 	}
 	fmt.Fprintf(env.Out, "Уведомления: %s.", notifyText(want))
 	if !want {
-		fmt.Fprint(env.Out, " Журнал пишется, как прежде: vpnlock log.")
+		fmt.Fprint(env.Out, " Журнал пишется, как прежде: appguard log.")
 	}
 	fmt.Fprintln(env.Out)
 	return 0

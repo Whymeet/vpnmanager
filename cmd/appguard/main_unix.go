@@ -17,18 +17,18 @@ import (
 	"syscall"
 	"time"
 
-	"vpnlock/internal/accounts"
-	"vpnlock/internal/apps"
-	"vpnlock/internal/cli"
-	"vpnlock/internal/exitcheck"
-	"vpnlock/internal/install"
-	"vpnlock/internal/netwatch"
-	"vpnlock/internal/notify"
-	"vpnlock/internal/paths"
-	"vpnlock/internal/procs"
-	"vpnlock/internal/service"
-	"vpnlock/internal/sysdns"
-	"vpnlock/internal/version"
+	"appguard/internal/accounts"
+	"appguard/internal/apps"
+	"appguard/internal/cli"
+	"appguard/internal/exitcheck"
+	"appguard/internal/install"
+	"appguard/internal/netwatch"
+	"appguard/internal/notify"
+	"appguard/internal/paths"
+	"appguard/internal/procs"
+	"appguard/internal/service"
+	"appguard/internal/sysdns"
+	"appguard/internal/version"
 )
 
 // dnsAddr — где слушает резолвер службы. Порт не 53: на нём часто уже сидит
@@ -58,13 +58,13 @@ func platform(env *cli.Env) {
 	platformCLI(env)
 }
 
-// update собирает vpnlock в клоне от имени того, кто вызвал sudo: сборка от
-// root испортила бы кэш Go в .toolchain клона. Потом собранный vpnlock ставит
+// update собирает appguard в клоне от имени того, кто вызвал sudo: сборка от
+// root испортила бы кэш Go в .toolchain клона. Потом собранный appguard ставит
 // себя сам, как на шаге установки, — с теми же настройками.
 func update(clone string) error {
 	acc := sudoAgent()
 	if acc == nil {
-		return errors.New("запусти через sudo из своей учётной записи: собирается vpnlock от твоего имени")
+		return errors.New("запусти через sudo из своей учётной записи: собирается appguard от твоего имени")
 	}
 	u, err := user.LookupId(strconv.Itoa(acc.UID))
 	if err != nil {
@@ -79,7 +79,7 @@ func update(clone string) error {
 	if err := prep.Run(); err != nil {
 		return fmt.Errorf("подготовка не прошла: %w", err)
 	}
-	inst := exec.Command(filepath.Join(clone, "bin", "vpnlock"), "install")
+	inst := exec.Command(filepath.Join(clone, "bin", "appguard"), "install")
 	inst.Stdin, inst.Stdout, inst.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := inst.Run(); err != nil {
 		return fmt.Errorf("новая версия не встала: %w", err)

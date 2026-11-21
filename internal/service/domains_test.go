@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/enforce"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/enforce"
+	"appguard/internal/ipc"
+	"appguard/internal/service/servicetest"
 )
 
 // Сценарии таски 25: обучение записывает домены — имена, которые стоят за

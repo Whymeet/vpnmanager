@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"syscall"
 
-	"vpnlock/internal/ipc"
+	"appguard/internal/ipc"
 )
 
 // System — учётные записи этой системы.

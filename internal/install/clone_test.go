@@ -7,12 +7,12 @@ import (
 )
 
 // Клон на Windows: Git для Windows по умолчанию кладёт файлы с CRLF. Без этого
-// установка не запоминала клон, а `vpnlock update` и `vpnlock apply` его не
+// установка не запоминала клон, а `appguard update` и `appguard apply` его не
 // находили даже из его же папки.
 func TestIsCloneAcceptsWindowsLineEndings(t *testing.T) {
 	for name, gomod := range map[string]string{
-		"LF":   "module vpnlock\n\ngo 1.26\n",
-		"CRLF": "module vpnlock\r\n\r\ngo 1.26\r\n",
+		"LF":   "module appguard\n\ngo 1.26\n",
+		"CRLF": "module appguard\r\n\r\ngo 1.26\r\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()
@@ -31,8 +31,8 @@ func TestIsCloneAcceptsWindowsLineEndings(t *testing.T) {
 		})
 	}
 	for name, gomod := range map[string]string{
-		"другой модуль":      "module vpnlockx\r\n",
-		"модуль не в начале": "// vpnlock\nmodule vpnlock\n",
+		"другой модуль":      "module appguardx\r\n",
+		"модуль не в начале": "// appguard\nmodule appguard\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			dir := t.TempDir()

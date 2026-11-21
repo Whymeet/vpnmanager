@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/enforce"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/enforce"
+	"appguard/internal/ipc"
+	"appguard/internal/service/servicetest"
 )
 
 // Сценарии таски 06: каталог. Приложение из каталога защищено сразу,
@@ -64,7 +64,7 @@ func TestNewerCatalogIsNotApplied(t *testing.T) {
 	if resp.OK || !strings.Contains(resp.Error, "обнови инструмент") {
 		t.Fatalf("каталог новее формата принят: %+v", resp)
 	}
-	hasLine(t, s, "новый каталог не применён: каталог записан более новой версией vpnlock — обнови инструмент")
+	hasLine(t, s, "новый каталог не применён: каталог записан более новой версией appguard — обнови инструмент")
 	if st := s.Status(t); st.Catalog != "2026-10-15" {
 		t.Fatalf("прежний каталог не действует: %q", st.Catalog)
 	}

@@ -19,15 +19,15 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/apps"
-	"vpnlock/internal/core"
-	"vpnlock/internal/dnswatch"
-	"vpnlock/internal/enforce"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/paths"
-	"vpnlock/internal/procs"
-	"vpnlock/internal/resolver"
-	"vpnlock/internal/service"
+	"appguard/internal/apps"
+	"appguard/internal/core"
+	"appguard/internal/dnswatch"
+	"appguard/internal/enforce"
+	"appguard/internal/ipc"
+	"appguard/internal/paths"
+	"appguard/internal/procs"
+	"appguard/internal/resolver"
+	"appguard/internal/service"
 
 	"github.com/miekg/dns"
 )
@@ -44,7 +44,7 @@ const GuardEvery = 20 * time.Millisecond
 // Accounts — учётные записи с одним решением на всех.
 type Accounts struct {
 	Admin bool
-	Owner bool // владеет любым путём: клоном, из которого поставлен vpnlock
+	Owner bool // владеет любым путём: клоном, из которого поставлен appguard
 
 	mu    sync.Mutex
 	asked []int

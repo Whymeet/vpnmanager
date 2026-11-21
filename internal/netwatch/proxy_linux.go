@@ -1,6 +1,6 @@
 package netwatch
 
-import "vpnlock/internal/core"
+import "appguard/internal/core"
 
 // proxyPoll — опрашивать на Linux нечего: единого системного прокси нет (у GNOME
 // свой, у KDE свой, у консольных программ — переменные окружения), поэтому клиент

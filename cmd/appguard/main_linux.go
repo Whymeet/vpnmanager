@@ -6,20 +6,20 @@ import (
 	"os"
 	"time"
 
-	"vpnlock/internal/apps"
-	"vpnlock/internal/cli"
-	"vpnlock/internal/enforce"
-	"vpnlock/internal/install"
-	"vpnlock/internal/paths"
-	"vpnlock/internal/service"
-	"vpnlock/internal/sysdns"
+	"appguard/internal/apps"
+	"appguard/internal/cli"
+	"appguard/internal/enforce"
+	"appguard/internal/install"
+	"appguard/internal/paths"
+	"appguard/internal/service"
+	"appguard/internal/sysdns"
 )
 
 // setupDir — папка установочных скриптов этой системы в клоне.
 const setupDir = "linux"
 
 func installer(L paths.Layout) *install.Installer {
-	return &install.Installer{Layout: L, Systemd: install.Systemctl{}, Agent: sudoAgent(), Preflight: enforce.Preflight}
+	return &install.Installer{Layout: L, Systemd: install.Systemctl{}, Agent: sudoAgent(), Preflight: enforce.Preflight, Legacy: legacy(L)}
 }
 
 func enforcer(L paths.Layout) enforce.Enforcer {
@@ -78,7 +78,7 @@ func installNote(note string) string {
 	if sysdns.Active() && sysdns.Stub() {
 		return note
 	}
-	const noDNS = "systemd-resolved не работает или программы его не спрашивают (в /etc/resolv.conf нет 127.0.0.53): приложения защищены полностью, а домены сайтов (vpnlock protect <домен>) закрываются только по адресам из каталога."
+	const noDNS = "systemd-resolved не работает или программы его не спрашивают (в /etc/resolv.conf нет 127.0.0.53): приложения защищены полностью, а домены сайтов (appguard protect <домен>) закрываются только по адресам из каталога."
 	if note == "" {
 		return noDNS
 	}

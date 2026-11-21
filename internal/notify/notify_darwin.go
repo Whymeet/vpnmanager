@@ -15,7 +15,7 @@ import (
 )
 
 // Title — заголовок уведомлений.
-const Title = "vpnlock"
+const Title = "appguard"
 
 // timeout — сколько ждать показа: osascript может задуматься, а журнал от
 // уведомления не зависит.

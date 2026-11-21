@@ -24,7 +24,7 @@ func gitPath() (string, error) {
 	return "", errors.New("git не найден: поставь Git для Windows (winget install --id Git.Git)")
 }
 
-// quiet — git запускает задача из vpnlockw.exe, у которой нет консоли: без
+// quiet — git запускает задача из appguardw.exe, у которой нет консоли: без
 // этого у каждого вызова git мелькало бы окно.
 func quiet(cmd *exec.Cmd) {
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: windows.CREATE_NO_WINDOW}

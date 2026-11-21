@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"vpnlock/internal/paths"
+	"appguard/internal/paths"
 )
 
 type fakeSystemd struct {
@@ -32,9 +32,9 @@ func clone(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	for name, data := range map[string]string{
-		"bin/vpnlock": "#!/bin/sh\n",
-		"go.mod":      "module vpnlock\n\ngo 1.27\n",
-		"setup/.keep": "",
+		"bin/appguard": "#!/bin/sh\n",
+		"go.mod":       "module appguard\n\ngo 1.27\n",
+		"setup/.keep":  "",
 	} {
 		p := filepath.Join(dir, name)
 		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
@@ -56,10 +56,10 @@ func installer(t *testing.T) (*Installer, *fakeSystemd) {
 func TestInstallStartsServiceAndTimer(t *testing.T) {
 	in, sd := installer(t)
 	src := clone(t)
-	if err := in.Install(filepath.Join(src, "bin", "vpnlock")); err != nil {
+	if err := in.Install(filepath.Join(src, "bin", "appguard")); err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"halt vpnlock.service", "reload", "start vpnlock.service", "reload", "start vpnlock-catalog.timer"}
+	want := []string{"halt appguard.service", "reload", "start appguard.service", "reload", "start appguard-catalog.timer"}
 	if !slices.Equal(sd.calls, want) {
 		t.Errorf("%q", sd.calls)
 	}
@@ -84,7 +84,7 @@ func TestInstallStartsServiceAndTimer(t *testing.T) {
 func TestInstallStopsBeforeChangesWhenSystemCannot(t *testing.T) {
 	in, sd := installer(t)
 	in.Preflight = func() error { return errors.New("в ядре нет net_cls") }
-	err := in.Install(filepath.Join(clone(t), "bin", "vpnlock"))
+	err := in.Install(filepath.Join(clone(t), "bin", "appguard"))
 	if err == nil || !strings.Contains(err.Error(), "ничего не изменено") {
 		t.Fatal(err)
 	}
@@ -100,7 +100,7 @@ func TestInstallStopsBeforeChangesWhenSystemCannot(t *testing.T) {
 // без неё и без автозапуска.
 func TestInstallFailureRestartsPreviousService(t *testing.T) {
 	in, sd := installer(t)
-	if err := in.Install(filepath.Join(clone(t), "bin", "vpnlock")); err != nil {
+	if err := in.Install(filepath.Join(clone(t), "bin", "appguard")); err != nil {
 		t.Fatal(err)
 	}
 	sd.calls = nil
@@ -108,7 +108,7 @@ func TestInstallFailureRestartsPreviousService(t *testing.T) {
 	if err == nil {
 		t.Fatal("обновление без файла прошло")
 	}
-	if !slices.Equal(sd.calls, []string{"halt vpnlock.service", "start vpnlock.service"}) {
+	if !slices.Equal(sd.calls, []string{"halt appguard.service", "start appguard.service"}) {
 		t.Errorf("%q", sd.calls)
 	}
 }
@@ -117,7 +117,7 @@ func TestInstallFailureRestartsPreviousService(t *testing.T) {
 func TestInstallFromInstalledBinaryKeepsClone(t *testing.T) {
 	in, _ := installer(t)
 	src := clone(t)
-	if err := in.Install(filepath.Join(src, "bin", "vpnlock")); err != nil {
+	if err := in.Install(filepath.Join(src, "bin", "appguard")); err != nil {
 		t.Fatal(err)
 	}
 	if err := in.Install(in.Layout.Binary); err != nil {
@@ -137,7 +137,7 @@ func TestInstallLeavesForeignCommandAlone(t *testing.T) {
 	if err := os.WriteFile(link, []byte("чужой"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := in.Install(filepath.Join(clone(t), "bin", "vpnlock")); err == nil {
+	if err := in.Install(filepath.Join(clone(t), "bin", "appguard")); err == nil {
 		t.Fatal("установка перезаписала чужой файл")
 	}
 	if len(sd.calls) != 0 {
@@ -148,10 +148,10 @@ func TestInstallLeavesForeignCommandAlone(t *testing.T) {
 func TestInstallWithoutSudoUserStillWorks(t *testing.T) {
 	in, sd := installer(t)
 	in.Agent = nil
-	if err := in.Install(filepath.Join(clone(t), "bin", "vpnlock")); err != nil {
+	if err := in.Install(filepath.Join(clone(t), "bin", "appguard")); err != nil {
 		t.Fatal(err)
 	}
-	if slices.Contains(sd.calls, "start vpnlock-catalog.timer") {
+	if slices.Contains(sd.calls, "start appguard-catalog.timer") {
 		t.Error("задача каталога без пользователя")
 	}
 	if !strings.Contains(in.Note, "не поставлено") {
@@ -161,14 +161,14 @@ func TestInstallWithoutSudoUserStillWorks(t *testing.T) {
 
 func TestUninstallOrder(t *testing.T) {
 	in, sd := installer(t)
-	src := filepath.Join(clone(t), "bin", "vpnlock")
+	src := filepath.Join(clone(t), "bin", "appguard")
 	if err := in.Install(src); err != nil {
 		t.Fatal(err)
 	}
 	sd.calls = nil
 	cleared := false
 	in.Clear = func() error {
-		if !slices.Contains(sd.calls, "halt vpnlock.service") {
+		if !slices.Contains(sd.calls, "halt appguard.service") {
 			t.Error("правила снимаются при живом стороже")
 		}
 		if _, err := os.Stat(in.Layout.AppDir); err != nil {
@@ -194,27 +194,27 @@ func TestUninstallOrder(t *testing.T) {
 // multi-user.target.wants осталась бы ссылка в никуда.
 func TestRemoveFromServiceDisablesItWithoutStopping(t *testing.T) {
 	in, sd := installer(t)
-	if err := in.Install(filepath.Join(clone(t), "bin", "vpnlock")); err != nil {
+	if err := in.Install(filepath.Join(clone(t), "bin", "appguard")); err != nil {
 		t.Fatal(err)
 	}
 	sd.calls = nil
 	if err := in.Remove(); err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Contains(sd.calls, "disable vpnlock.service") {
+	if !slices.Contains(sd.calls, "disable appguard.service") {
 		t.Errorf("автозапуск не снят: %q", sd.calls)
 	}
-	if slices.Contains(sd.calls, "halt vpnlock.service") {
+	if slices.Contains(sd.calls, "halt appguard.service") {
 		t.Errorf("служба остановила саму себя посреди удаления: %q", sd.calls)
 	}
 }
 
 func TestUninstallKeepsRulesWhenServiceSurvives(t *testing.T) {
 	in, sd := installer(t)
-	if err := in.Install(filepath.Join(clone(t), "bin", "vpnlock")); err != nil {
+	if err := in.Install(filepath.Join(clone(t), "bin", "appguard")); err != nil {
 		t.Fatal(err)
 	}
-	sd.fail = map[string]error{"halt vpnlock.service": errors.New("не остановилась")}
+	sd.fail = map[string]error{"halt appguard.service": errors.New("не остановилась")}
 	in.Clear = func() error {
 		t.Error("правила сняты при работающей службе")
 		return nil
@@ -237,9 +237,9 @@ func TestUnitStartsBeforeNetworkAndLoadsClosedRulesFirst(t *testing.T) {
 	text := string(unitFile(paths.Under("/")))
 	for _, want := range []string{
 		"DefaultDependencies=no", "Before=network-pre.target", "Wants=network-pre.target",
-		"Type=notify", `ExecStartPre=-nft -f "/opt/vpnlock/state/closed.nft"`, `ExecStart="/opt/vpnlock/bin/vpnlock" daemon`,
+		"Type=notify", `ExecStartPre=-nft -f "/opt/appguard/state/closed.nft"`, `ExecStart="/opt/appguard/bin/appguard" daemon`,
 		"Restart=always", "WatchdogSec=60", "WantedBy=multi-user.target",
-		"StandardOutput=append:/var/log/vpnlock/daemon.log", "StandardError=append:/var/log/vpnlock/daemon.log",
+		"StandardOutput=append:/var/log/appguard/daemon.log", "StandardError=append:/var/log/appguard/daemon.log",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("нет %q:\n%s", want, text)
@@ -255,7 +255,7 @@ func TestUnitStartsBeforeNetworkAndLoadsClosedRulesFirst(t *testing.T) {
 
 func TestInstallPutsTrayAutostart(t *testing.T) {
 	in, sd := installer(t)
-	if err := in.Install(filepath.Join(clone(t), "bin", "vpnlock")); err != nil {
+	if err := in.Install(filepath.Join(clone(t), "bin", "appguard")); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(in.Layout.TrayStart)
@@ -281,7 +281,7 @@ func TestInstallPutsTrayAutostart(t *testing.T) {
 
 func TestReinstallKeepsOneTrayAutostart(t *testing.T) {
 	in, _ := installer(t)
-	src := filepath.Join(clone(t), "bin", "vpnlock")
+	src := filepath.Join(clone(t), "bin", "appguard")
 	for range 2 {
 		if err := in.Install(src); err != nil {
 			t.Fatal(err)
@@ -303,7 +303,7 @@ func TestUninstallRemovesTrayAutostart(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			in, _ := installer(t)
-			if err := in.Install(filepath.Join(clone(t), "bin", "vpnlock")); err != nil {
+			if err := in.Install(filepath.Join(clone(t), "bin", "appguard")); err != nil {
 				t.Fatal(err)
 			}
 			if err := uninstall(in); err != nil {
@@ -328,13 +328,13 @@ func TestTrayFailureDoesNotStopInstall(t *testing.T) {
 	if err := os.WriteFile(dir, []byte("файл вместо папки"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := in.Install(filepath.Join(clone(t), "bin", "vpnlock")); err != nil {
+	if err := in.Install(filepath.Join(clone(t), "bin", "appguard")); err != nil {
 		t.Fatal(err)
 	}
 	if !strings.Contains(in.Note, "Значок не поставлен") || !strings.Contains(in.Note, "Защита работает и без него") {
 		t.Errorf("%q", in.Note)
 	}
-	if !slices.Contains(sd.calls, "start vpnlock.service") || !slices.Contains(sd.calls, "start vpnlock-catalog.timer") {
+	if !slices.Contains(sd.calls, "start appguard.service") || !slices.Contains(sd.calls, "start appguard-catalog.timer") {
 		t.Errorf("%q", sd.calls)
 	}
 }
@@ -342,13 +342,13 @@ func TestTrayFailureDoesNotStopInstall(t *testing.T) {
 // Кавычка в аргументе экранируется в Exec= и ещё раз как строка файла .desktop.
 func TestDesktopArgFollowsTheSpec(t *testing.T) {
 	for in, want := range map[string]string{
-		"/opt/vpnlock/bin/vpnlock": `"/opt/vpnlock/bin/vpnlock"`,
-		`/opt/a b/x`:               `"/opt/a b/x"`,
-		`/opt/100%`:                `"/opt/100%%"`,
-		`/a"b`:                     `"/a\\"b"`,
-		`/a$b`:                     `"/a\\$b"`,
-		"/a`b":                     "\"/a\\\\`b\"",
-		`/a\b`:                     `"/a\\\\b"`,
+		"/opt/appguard/bin/appguard": `"/opt/appguard/bin/appguard"`,
+		`/opt/a b/x`:                 `"/opt/a b/x"`,
+		`/opt/100%`:                  `"/opt/100%%"`,
+		`/a"b`:                       `"/a\\"b"`,
+		`/a$b`:                       `"/a\\$b"`,
+		"/a`b":                       "\"/a\\\\`b\"",
+		`/a\b`:                       `"/a\\\\b"`,
 	} {
 		if got := desktopArg(in); got != want {
 			t.Errorf("%q: %s, ждали %s", in, got, want)

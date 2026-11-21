@@ -3,7 +3,7 @@ package cli
 import (
 	"testing"
 
-	"vpnlock/internal/ipc"
+	"appguard/internal/ipc"
 )
 
 // Claude — приложение, claude — Claude Code: точное имя решает; без учёта

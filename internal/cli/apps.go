@@ -11,10 +11,10 @@ import (
 	"slices"
 	"strings"
 
-	"vpnlock/internal/apps"
-	"vpnlock/internal/core"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/tui"
+	"appguard/internal/apps"
+	"appguard/internal/core"
+	"appguard/internal/ipc"
+	"appguard/internal/tui"
 )
 
 // addApp — «Добавить приложение». Без аргумента в терминале — выбор из
@@ -23,7 +23,7 @@ import (
 // Linux — ещё и служба systemd (nginx, nginx.service).
 func addApp(env Env, args []string) int {
 	if len(args) > 1 {
-		fmt.Fprintln(env.Err, "Укажи одно приложение: vpnlock add Notion")
+		fmt.Fprintln(env.Err, "Укажи одно приложение: appguard add Notion")
 		return 2
 	}
 	st, ok := currentStatus(env)
@@ -39,7 +39,7 @@ func addApp(env Env, args []string) int {
 		}
 	default:
 		if !env.Interactive {
-			fmt.Fprintln(env.Err, "Укажи приложение: vpnlock add Notion — или запусти команду в терминале и выбери из списка.")
+			fmt.Fprintln(env.Err, "Укажи приложение: appguard add Notion — или запусти команду в терминале и выбери из списка.")
 			return 2
 		}
 		a, ok := chooseInstalled(env, st.Apps)
@@ -64,7 +64,7 @@ func addApp(env Env, args []string) int {
 func printAdded(env Env, a ipc.AppStatus) {
 	switch {
 	case a.Catalog:
-		fmt.Fprintf(env.Out, "%s защищено по каталогу курса: без проверенного VPN его сервисы закрыты.\n", a.Name)
+		fmt.Fprintf(env.Out, "%s защищено по каталогу: без проверенного VPN его сервисы закрыты.\n", a.Name)
 	case a.Learned:
 		fmt.Fprintf(env.Out, "%s защищено: в сеть оно выходит только через проверенный VPN.\n", a.Name)
 	case a.Command:
@@ -100,7 +100,7 @@ func resolveApp(env Env, arg string) (path, name string, missing, ok bool) {
 	case service != "":
 		return service, "", false, true
 	case len(found) > 0 && command != "":
-		fmt.Fprintf(env.Err, "Под «%s» подходит и приложение, и консольная программа — укажи путь:\n  vpnlock add %q   — приложение\n  vpnlock add %q   — консольная программа\n", arg, found[0].Path, command)
+		fmt.Fprintf(env.Err, "Под «%s» подходит и приложение, и консольная программа — укажи путь:\n  appguard add %q   — приложение\n  appguard add %q   — консольная программа\n", arg, found[0].Path, command)
 		return "", "", false, false
 	case command != "":
 		return command, "", false, true
@@ -112,7 +112,7 @@ func resolveApp(env Env, arg string) (path, name string, missing, ok bool) {
 		case "linux":
 			also = ", и консольной программы со службой с таким именем тоже"
 		}
-		fmt.Fprintf(env.Err, "Приложения «%s» нет %s%s. Список установленных — vpnlock add (без имени), в терминале.\n", arg, installedWhere(), also)
+		fmt.Fprintf(env.Err, "Приложения «%s» нет %s%s. Список установленных — appguard add (без имени), в терминале.\n", arg, installedWhere(), also)
 		return "", "", true, false
 	case len(found) > 1:
 		fmt.Fprintf(env.Err, "Под «%s» подходит несколько приложений — укажи путь:\n", arg)
@@ -150,7 +150,7 @@ func pickService(env Env, name, command string) (service string, ok bool) {
 	case env.SameProgram(service, command):
 		return "", true
 	}
-	fmt.Fprintf(env.Err, "Под «%s» подходит и служба, и консольная программа — укажи какую:\n  vpnlock add %s.service   — служба\n  vpnlock add %s   — консольная программа\n", name, name, command)
+	fmt.Fprintf(env.Err, "Под «%s» подходит и служба, и консольная программа — укажи какую:\n  appguard add %s.service   — служба\n  appguard add %s   — консольная программа\n", name, name, command)
 	return "", false
 }
 
@@ -222,7 +222,7 @@ func chooseInstalled(env Env, added []ipc.AppStatus) (apps.App, bool) {
 func removeApp(env Env, args []string) int {
 	yes, rest := takeYes(args)
 	if len(rest) > 1 {
-		fmt.Fprintln(env.Err, "Укажи одно приложение: vpnlock remove Notion")
+		fmt.Fprintln(env.Err, "Укажи одно приложение: appguard remove Notion")
 		return 2
 	}
 	st, ok := currentStatus(env)
@@ -253,7 +253,7 @@ func removeApp(env Env, args []string) int {
 		}
 		target = st.Apps[i]
 	default:
-		fmt.Fprintln(env.Err, "Укажи приложение: vpnlock remove Notion")
+		fmt.Fprintln(env.Err, "Укажи приложение: appguard remove Notion")
 		return 2
 	}
 
@@ -310,7 +310,7 @@ func rule(env Env, args []string) int {
 		case "any":
 			want = core.RuleAny
 		default:
-			fmt.Fprintf(env.Err, "Нет правила «%s»: vpnlock rule any — любой выход не из России, vpnlock rule mine — только мои выходы.\n", args[0])
+			fmt.Fprintf(env.Err, "Нет правила «%s»: appguard rule any — любой выход не из России, appguard rule mine — только мои выходы.\n", args[0])
 			return 2
 		}
 	case len(args) > 1:
@@ -381,7 +381,7 @@ func exitText(x ipc.ExitStatus) string {
 }
 
 // remember — «Запомнить текущий выход»: показывает адрес и страну выхода сейчас
-// и сохраняет его под именем. Адрес последним аргументом (vpnlock remember
+// и сохраняет его под именем. Адрес последним аргументом (appguard remember
 // Сингапур 203.0.113.5) — выход без подключения: страну служба узнает, когда
 // выйдет через него. Нужен адрес выхода, а не сервера: у цепочек, где сервер
 // в России, а выход за границей, они разные.
@@ -399,7 +399,7 @@ func remember(env Env, args []string) int {
 	if ip == "" {
 		now, ok := currentExit(st)
 		if !ok {
-			fmt.Fprintln(env.Err, "Сейчас нет проверенного выхода — включи VPN и дождись в статусе строки «проверен». Или запомни выход по адресу, без подключения: vpnlock remember Сингапур 203.0.113.5")
+			fmt.Fprintln(env.Err, "Сейчас нет проверенного выхода — включи VPN и дождись в статусе строки «проверен». Или запомни выход по адресу, без подключения: appguard remember Сингапур 203.0.113.5")
 			return 1
 		}
 		fmt.Fprintf(env.Out, "Сейчас выход %s, %s.\n", now.IP, core.CountryName(now.Country))
@@ -407,7 +407,7 @@ func remember(env Env, args []string) int {
 	name := strings.TrimSpace(strings.Join(args, " "))
 	if name == "" {
 		if !env.Interactive {
-			fmt.Fprintln(env.Err, "Укажи имя выхода: vpnlock remember Server 1 — текущий выход, vpnlock remember Сингапур 203.0.113.5 — выход по адресу, без подключения")
+			fmt.Fprintln(env.Err, "Укажи имя выхода: appguard remember Server 1 — текущий выход, appguard remember Сингапур 203.0.113.5 — выход по адресу, без подключения")
 			return 2
 		}
 		fmt.Fprint(env.Out, "Как назвать этот выход (например, Server 1)? ")
@@ -426,7 +426,7 @@ func remember(env Env, args []string) int {
 		return 1
 	}
 	if ip != "" && resp.Exit.IP != ip {
-		fmt.Fprintf(env.Err, "Служба старой версии запомнила под этим именем текущий выход (%s), а не %s. Обнови vpnlock — установкой из клона, она поставит новую версию поверх.\n", resp.Exit.IP, ip)
+		fmt.Fprintf(env.Err, "Служба старой версии запомнила под этим именем текущий выход (%s), а не %s. Обнови appguard — установкой из клона, она поставит новую версию поверх.\n", resp.Exit.IP, ip)
 		return 1
 	}
 	fmt.Fprintf(env.Out, "Запомнено: %s.\n", exitText(*resp.Exit))
@@ -437,7 +437,7 @@ func remember(env Env, args []string) int {
 покажет настоящий адрес выхода.`)
 	}
 	if st.Rule != core.RuleMine {
-		fmt.Fprintln(env.Out, "Чтобы сервисы открывались только через твои выходы, выбери правило «только мои выходы»: vpnlock rule mine")
+		fmt.Fprintln(env.Out, "Чтобы сервисы открывались только через твои выходы, выбери правило «только мои выходы»: appguard rule mine")
 	}
 	return 0
 }

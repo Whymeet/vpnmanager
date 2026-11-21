@@ -1,4 +1,4 @@
-module vpnlock
+module appguard
 
 go 1.26.0
 

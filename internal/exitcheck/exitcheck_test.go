@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/core"
+	"appguard/internal/core"
 )
 
 // pages — ответы по адресу; нет адреса — источник не отвечает.

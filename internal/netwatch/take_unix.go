@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"vpnlock/internal/core"
+	"appguard/internal/core"
 )
 
 // Take снимает текущее состояние сети.

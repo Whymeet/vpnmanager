@@ -8,48 +8,48 @@ import (
 )
 
 // ServiceName — имя службы в диспетчере служб Windows.
-const ServiceName = "vpnlock"
+const ServiceName = "appguard"
 
 // PlannedStop — своя команда службе (коды 128–255 задаёт служба): «следующую
-// остановку начал сам vpnlock — обновление или удаление». Остановку без неё
+// остановку начал сам appguard — обновление или удаление». Остановку без неё
 // служба считает чужой и выходит с ошибкой, чтобы диспетчер служб запустил её
 // снова по правилам восстановления.
 const PlannedStop = 200
 
 // Задачи планировщика. NotifyTask при входе любого пользователя запускает
 // агента уведомлений в его сеансе, TrayTask — значок службы; CatalogTask раз в
-// сутки и при входе того, кто ставил vpnlock, обновляет каталог из его клона.
+// сутки и при входе того, кто ставил appguard, обновляет каталог из его клона.
 const (
-	NotifyTask  = "vpnlock-notify"
-	TrayTask    = "vpnlock-tray"
-	CatalogTask = "vpnlock-catalog"
+	NotifyTask  = "appguard-notify"
+	TrayTask    = "appguard-tray"
+	CatalogTask = "appguard-catalog"
 )
 
 // Layout — пути установки. Все они вне репозитория: настройки принадлежат
 // службе, среди них будут адреса VPN-серверов, и закоммитить их нельзя даже
 // случайно — git не добавляет файлы за пределами клона.
 type Layout struct {
-	AppDir     string // программа: Program Files\vpnlock, менять её может только администратор
+	AppDir     string // программа: Program Files\appguard, менять её может только администратор
 	Binary     string // исполняемый файл службы и клиента; его папка — в системном PATH
-	QuietExe   string // тот же vpnlock без окна консоли: его запускают задачи планировщика
-	DataDir    string // данные службы: ProgramData\vpnlock
+	QuietExe   string // тот же appguard без окна консоли: его запускают задачи планировщика
+	DataDir    string // данные службы: ProgramData\appguard
 	StateDir   string // настройки и состояние службы, доступ только у службы и администраторов
 	ConfigFile string
 	LockFile   string // держит работающая служба: второй экземпляр не стартует
 	Socket     string // локальный канал клиент ↔ служба — именованный канал
 	LogDir     string
 	LogFile    string // вывод службы: старт, остановка, ошибки
-	CloneFile  string // из какого клона поставлен vpnlock: оттуда его обновляет `vpnlock update`
+	CloneFile  string // из какого клона поставлен appguard: оттуда его обновляет `appguard update`
 }
 
-// Traces — что остаётся на диске от установки: есть хоть одно — vpnlock
+// Traces — что остаётся на диске от установки: есть хоть одно — appguard
 // установлен.
 func (L Layout) Traces() []string { return []string{L.AppDir, L.DataDir} }
 
 // System — раскладка на живой системе.
 func System() Layout {
 	return layout(known(windows.FOLDERID_ProgramFiles, `C:\Program Files`),
-		known(windows.FOLDERID_ProgramData, `C:\ProgramData`), `\\.\pipe\vpnlock`)
+		known(windows.FOLDERID_ProgramData, `C:\ProgramData`), `\\.\pipe\appguard`)
 }
 
 // Under — та же раскладка внутри каталога root: тесты ставят и снимают
@@ -57,18 +57,18 @@ func System() Layout {
 // у канала своё имя — чтобы не столкнуться с работающей службой.
 func Under(root string) Layout {
 	return layout(filepath.Join(root, "Program Files"), filepath.Join(root, "ProgramData"),
-		`\\.\pipe\vpnlock-`+filepath.Base(root))
+		`\\.\pipe\appguard-`+filepath.Base(root))
 }
 
 func layout(programFiles, programData, pipe string) Layout {
-	app := filepath.Join(programFiles, "vpnlock")
-	data := filepath.Join(programData, "vpnlock")
+	app := filepath.Join(programFiles, "appguard")
+	data := filepath.Join(programData, "appguard")
 	state := filepath.Join(data, "state")
 	logs := filepath.Join(data, "logs")
 	return Layout{
 		AppDir:     app,
-		Binary:     filepath.Join(app, "bin", "vpnlock.exe"),
-		QuietExe:   filepath.Join(app, "bin", "vpnlockw.exe"),
+		Binary:     filepath.Join(app, "bin", "appguard.exe"),
+		QuietExe:   filepath.Join(app, "bin", "appguardw.exe"),
 		DataDir:    data,
 		StateDir:   state,
 		ConfigFile: filepath.Join(state, "config.json"),
@@ -86,4 +86,21 @@ func known(id *windows.KNOWNFOLDERID, fallback string) string {
 		return p
 	}
 	return fallback
+}
+
+// LegacySystem и LegacyUnder — где лежит установка под прежним именем vpnlock
+// (до 0.23.0): её бинарник и настройки. Установка appguard забирает настройки и
+// снимает её этим бинарником.
+func LegacySystem() (binary, state string) {
+	return legacy(known(windows.FOLDERID_ProgramFiles, `C:\Program Files`),
+		known(windows.FOLDERID_ProgramData, `C:\ProgramData`))
+}
+
+func LegacyUnder(root string) (binary, state string) {
+	return legacy(filepath.Join(root, "Program Files"), filepath.Join(root, "ProgramData"))
+}
+
+func legacy(programFiles, programData string) (binary, state string) {
+	return filepath.Join(programFiles, "vpnlock", "bin", "vpnlock.exe"),
+		filepath.Join(programData, "vpnlock", "state")
 }

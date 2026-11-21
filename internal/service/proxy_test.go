@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/core"
-	"vpnlock/internal/enforce"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/core"
+	"appguard/internal/enforce"
+	"appguard/internal/ipc"
+	"appguard/internal/service/servicetest"
 )
 
 // Сценарии таски 09: VPN-клиент в режиме системного прокси. Прокси — ещё один

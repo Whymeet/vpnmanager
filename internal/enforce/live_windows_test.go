@@ -18,7 +18,7 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"vpnlock/internal/netwatch"
+	"appguard/internal/netwatch"
 )
 
 func TestLiveWFPLetsAppOutOnlyFromOpenAddrs(t *testing.T) {
@@ -33,7 +33,7 @@ func TestLiveWFPLetsAppOutOnlyFromOpenAddrs(t *testing.T) {
 	if err != nil {
 		t.Skipf("нет curl.exe: %v", err)
 	}
-	exe := filepath.Join(t.TempDir(), "vpnlock-live-curl.exe")
+	exe := filepath.Join(t.TempDir(), "appguard-live-curl.exe")
 	if err := os.WriteFile(exe, data, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -113,7 +113,7 @@ func TestLiveWFPPicksUpNewExeInAppFolder(t *testing.T) {
 	if err != nil {
 		t.Skipf("нет curl.exe: %v", err)
 	}
-	app := filepath.Join(t.TempDir(), "VpnlockLiveApp")
+	app := filepath.Join(t.TempDir(), "AppguardLiveApp")
 	os.MkdirAll(app, 0o755)
 	old := filepath.Join(app, "app.exe")
 	os.WriteFile(old, data, 0o755)

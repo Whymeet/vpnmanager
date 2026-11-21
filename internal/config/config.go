@@ -134,7 +134,7 @@ func Open(path string) (*Store, error) {
 		}
 	}
 	if st.Schema > Schema {
-		return nil, fmt.Errorf("настройки записаны более новой версией vpnlock (формат %d, эта сборка понимает %d) — обнови инструмент", st.Schema, Schema)
+		return nil, fmt.Errorf("настройки записаны более новой версией appguard (формат %d, эта сборка понимает %d) — обнови инструмент", st.Schema, Schema)
 	}
 	s.cur = st
 	return s, nil

@@ -1,4 +1,4 @@
-// Команда vpnlock: клиент (меню и команды) и служба в одном исполняемом файле.
+// Команда appguard: клиент (меню и команды) и служба в одном исполняемом файле.
 package main
 
 import (
@@ -8,15 +8,16 @@ import (
 	"path/filepath"
 	"time"
 
-	"vpnlock/internal/apps"
-	"vpnlock/internal/cli"
-	"vpnlock/internal/core"
-	"vpnlock/internal/netwatch"
-	"vpnlock/internal/paths"
-	"vpnlock/internal/resolver"
-	"vpnlock/internal/tray"
-	"vpnlock/internal/tui"
-	"vpnlock/internal/version"
+	"appguard/internal/apps"
+	"appguard/internal/cli"
+	"appguard/internal/core"
+	"appguard/internal/install"
+	"appguard/internal/netwatch"
+	"appguard/internal/paths"
+	"appguard/internal/resolver"
+	"appguard/internal/tray"
+	"appguard/internal/tui"
+	"appguard/internal/version"
 )
 
 // checkEvery — как часто служба перепроверяет выход: так смена выхода внутри
@@ -111,4 +112,15 @@ func upstreams() resolver.Upstreams {
 		_, index, ok := netwatch.Physical()
 		return index, ok
 	})
+}
+
+// legacy — прежняя установка vpnlock, которую установка appguard забирает и
+// снимает. Только на живой системе: тесты ставят во временную папку, и
+// настоящую установку им трогать нельзя.
+func legacy(L paths.Layout) *install.Legacy {
+	if L.AppDir != paths.System().AppDir {
+		return nil
+	}
+	bin, state := paths.LegacySystem()
+	return &install.Legacy{Binary: bin, StateDir: state}
 }

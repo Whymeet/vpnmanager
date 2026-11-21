@@ -7,10 +7,10 @@ import (
 	"slices"
 	"strings"
 
-	"vpnlock/internal/config"
-	"vpnlock/internal/core"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/learn"
+	"appguard/internal/config"
+	"appguard/internal/core"
+	"appguard/internal/ipc"
+	"appguard/internal/learn"
 )
 
 // loadPolicy берёт правило и мои выходы из настроек.
@@ -46,7 +46,7 @@ func (e *engine) setRule(rule string) error {
 var (
 	errNoExit      = errors.New("сейчас нет проверенного выхода — включи VPN и дождись в статусе строки «проверен»")
 	errManyExits   = errors.New("проверенных выходов несколько, а маршрут по умолчанию идёт мимо них — оставь включённым один VPN")
-	errRussianExit = errors.New("российский выход не сохраняется: с ним сервисы увидят российский адрес — ровно то, от чего защищает vpnlock")
+	errRussianExit = errors.New("российский выход не сохраняется: с ним сервисы увидят российский адрес — ровно то, от чего защищает appguard")
 )
 
 // remember запоминает выход под именем name. Без ip — текущий проверенный

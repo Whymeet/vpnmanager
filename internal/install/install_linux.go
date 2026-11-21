@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"vpnlock/internal/paths"
+	"appguard/internal/paths"
 )
 
 // Systemd — службы systemd.
@@ -46,6 +46,8 @@ type Installer struct {
 	// Clear снимает правила файрвола и резолверы при удалении на месте — после
 	// остановки службы (иначе её сторож вернул бы правила). nil — снимать нечего.
 	Clear func() error
+	// Legacy — прежняя установка vpnlock: забрать настройки и снять. nil — не искать.
+	Legacy *Legacy
 }
 
 // Agent — чьим именем ходит ежедневное обновление каталога: git в клоне идёт с его
@@ -71,6 +73,10 @@ func (in *Installer) Install(src string) error {
 			return fmt.Errorf("%w. В системе ничего не изменено", err)
 		}
 	}
+	carry, err := in.takeLegacy()
+	if err != nil {
+		return err
+	}
 	if err := in.Systemd.Halt(paths.Unit); err != nil {
 		return fmt.Errorf("не удалось остановить прежнюю службу: %w", err)
 	}
@@ -79,11 +85,16 @@ func (in *Installer) Install(src string) error {
 		in.Systemd.Start(paths.Unit)
 		return err
 	}
+	moved, err := in.restoreLegacy(carry)
+	if err != nil {
+		return err
+	}
 	if err := in.Systemd.Start(paths.Unit); err != nil {
 		return err
 	}
 	in.Note = joinNotes(in.Note, in.installTimer(src))
 	in.Note = joinNotes(in.Note, in.installTray())
+	in.Note = joinNotes(in.Note, moved)
 	return nil
 }
 
@@ -108,7 +119,7 @@ func (in *Installer) place(src string) error {
 		return err
 	}
 	if err := copyFile(src, L.Binary, 0o755); err != nil {
-		return fmt.Errorf("не удалось скопировать vpnlock: %w", err)
+		return fmt.Errorf("не удалось скопировать appguard: %w", err)
 	}
 	note, err := in.installCatalog(src)
 	if err != nil {
@@ -239,7 +250,7 @@ func (in *Installer) Uninstall() error {
 // нет. Домены служба направляет на resolved сама и повторяет, пока он не поднимется.
 func unitFile(L paths.Layout) []byte {
 	return fmt.Appendf(nil, `[Unit]
-Description=vpnlock: защищённые приложения выходят в сеть только через проверенный VPN
+Description=appguard: защищённые приложения выходят в сеть только через проверенный VPN
 DefaultDependencies=no
 After=local-fs.target
 Before=network-pre.target shutdown.target
@@ -263,10 +274,10 @@ WantedBy=multi-user.target
 `, unitArg(L.AppDir), unitArg(L.LogDir), unitArg(L.ClosedRules), unitArg(L.Binary), L.LogFile, L.LogFile)
 }
 
-// taskFile — обновление каталога от имени того, кто ставил vpnlock.
+// taskFile — обновление каталога от имени того, кто ставил appguard.
 func taskFile(L paths.Layout, a *Agent) []byte {
 	return fmt.Appendf(nil, `[Unit]
-Description=vpnlock: обновление каталога
+Description=appguard: обновление каталога
 Wants=network-online.target
 After=network-online.target
 
@@ -281,7 +292,7 @@ ExecStart=%s catalog sync %s
 // догонит пропущенный запуск.
 func timerFile() []byte {
 	return []byte(`[Unit]
-Description=vpnlock: обновление каталога раз в сутки
+Description=appguard: обновление каталога раз в сутки
 
 [Timer]
 OnBootSec=2min
@@ -298,8 +309,8 @@ WantedBy=timers.target
 func trayStartFile(L paths.Layout) []byte {
 	return fmt.Appendf(nil, `[Desktop Entry]
 Type=Application
-Name=vpnlock
-Comment=Значок службы vpnlock: в сети ли защищённые приложения
+Name=appguard
+Comment=Значок службы appguard: в сети ли защищённые приложения
 Exec=%s tray
 NoDisplay=true
 Terminal=false

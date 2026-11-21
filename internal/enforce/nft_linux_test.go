@@ -19,7 +19,7 @@ func addrs(s ...string) []netip.Addr {
 func TestRulesetClosed(t *testing.T) {
 	text := ruleset(Rules{V4: addrs("160.79.104.10", "1.2.3.4"), V6: addrs("2606:4700::1")}, found{})
 	for _, want := range []string{
-		"delete table inet vpnlock",
+		"delete table inet appguard",
 		"elements = { 1.2.3.4, 160.79.104.10 }",
 		"elements = { 2606:4700::1 }",
 		"meta cgroup 1447840513 jump app",
@@ -94,9 +94,9 @@ func TestParseLocalDNS(t *testing.T) {
 
 func TestTallyOwnTextMatchesNftOutput(t *testing.T) {
 	r := Rules{OpenIfaces: []string{"wg0"}, V4: addrs("1.2.3.4", "1.2.3.5", "1.2.3.6"), Servers: addrs("1.2.3.4"), Physical: "eth0"}
-	// Вывод `nft list table inet vpnlock` с настоящего ядра: nft разворачивает набор
+	// Вывод `nft list table inet appguard` с настоящего ядра: nft разворачивает набор
 	// из одного имени и переносит элементы по строкам.
-	const listed = `table inet vpnlock {
+	const listed = `table inet appguard {
 	set addrs4 {
 		type ipv4_addr
 		elements = { 1.2.3.4, 1.2.3.5,

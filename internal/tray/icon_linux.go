@@ -58,7 +58,7 @@ func System() (Icon, error) {
 	if dir == "" {
 		return nil, ErrNoSession
 	}
-	f, err := os.OpenFile(filepath.Join(dir, "vpnlock-tray.lock"), os.O_CREATE|os.O_RDWR, 0o600)
+	f, err := os.OpenFile(filepath.Join(dir, "appguard-tray.lock"), os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, err
 	}
@@ -195,7 +195,7 @@ func tip(v View) toolTip {
 	if v.Detail != "" {
 		text += ". " + v.Detail
 	}
-	return toolTip{Title: "vpnlock", Text: text, Icons: []pixmap{}}
+	return toolTip{Title: "appguard", Text: text, Icons: []pixmap{}}
 }
 
 // export выставляет значок с видом v и его меню m на шину под именем name.
@@ -205,8 +205,8 @@ func export(conn *dbus.Conn, name string, v View, m *menu) (*prop.Properties, er
 	// NewToolTip: PropertiesChanged хосты значков не слушают.
 	changing := func(v any) *prop.Prop { return &prop.Prop{Value: v, Emit: prop.EmitFalse} }
 	props, err := prop.Export(conn, itemPath, prop.Map{itemIface: {
-		"Id":         constant("vpnlock"),
-		"Title":      constant("vpnlock"),
+		"Id":         constant("appguard"),
+		"Title":      constant("appguard"),
 		"Category":   constant("SystemServices"),
 		"Status":     constant("Active"),
 		"WindowId":   constant(int32(0)),

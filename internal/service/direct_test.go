@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/ipc"
+	"appguard/internal/service/servicetest"
 )
 
 // Сценарии таски 08: «Россия напрямую». Российский сервис спрашивается через

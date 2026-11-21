@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/ipc"
+	"appguard/internal/service/servicetest"
 )
 
 // Сценарии таски 02: служба видит туннели и проверяет выход. Сеть и внешние

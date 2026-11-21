@@ -11,13 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/core"
-	"vpnlock/internal/exitcheck"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/netwatch"
-	"vpnlock/internal/paths"
-	"vpnlock/internal/service"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/core"
+	"appguard/internal/exitcheck"
+	"appguard/internal/ipc"
+	"appguard/internal/netwatch"
+	"appguard/internal/paths"
+	"appguard/internal/service"
+	"appguard/internal/service/servicetest"
 )
 
 func TestLiveServiceVerifiesCurrentVPN(t *testing.T) {

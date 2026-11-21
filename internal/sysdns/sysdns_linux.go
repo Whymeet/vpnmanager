@@ -1,12 +1,12 @@
 // Package sysdns направляет имена защищённых доменов на резолвер службы. На
 // Linux это systemd-resolved: у него домены назначаются интерфейсу, поэтому
-// vpnlock заводит свой пустой интерфейс и вешает на него резолвер службы и
+// appguard заводит свой пустой интерфейс и вешает на него резолвер службы и
 // домены маршрутизации (~домен). Остальные имена система резолвит как раньше, а
 // настройки чужих интерфейсов и файлы системы остаются нетронутыми.
 //
 // Без systemd-resolved направить домены некуда: приложения закрыты всё равно (их
 // сеть держит файрвол), а сайт в браузере закрывается только по адресам из
-// каталога и `vpnlock protect <адрес>`.
+// каталога и `appguard protect <адрес>`.
 package sysdns
 
 import (
@@ -24,9 +24,9 @@ import (
 )
 
 const (
-	// Iface — первый интерфейс vpnlock: через него никто никуда не ходит, это
+	// Iface — первый интерфейс appguard: через него никто никуда не ходит, это
 	// только место для настроек systemd-resolved.
-	Iface = "vpnlock0"
+	Iface = "appguard0"
 	// perLink — сколько доменов resolved принимает на интерфейс. На 257-м он
 	// отказывает всей команде, поэтому большой список раскладывается по нескольким.
 	perLink = 256
@@ -41,7 +41,7 @@ const (
 	linkWait  = 100 * time.Millisecond
 )
 
-// Resolved — домены vpnlock в systemd-resolved.
+// Resolved — домены appguard в systemd-resolved.
 type Resolved struct {
 	Addr netip.AddrPort // где слушает резолвер службы
 	// Run выполняет программу; ошибка содержит её вывод.
@@ -62,8 +62,8 @@ func System(addr netip.AddrPort) Resolved {
 	}}
 }
 
-// linkName — имя интерфейса номер i: vpnlock0, vpnlock1…
-func linkName(i int) string { return "vpnlock" + strconv.Itoa(i) }
+// linkName — имя интерфейса номер i: appguard0, appguard1…
+func linkName(i int) string { return "appguard" + strconv.Itoa(i) }
 
 // Active — systemd-resolved работает на этом компьютере.
 func Active() bool {
@@ -84,7 +84,7 @@ func run(name string, args ...string) error {
 
 // Set направляет на службу ровно эти домены. Чужих резолверов для домена resolved
 // не запрещает, поэтому skipped всегда пуст: самый длинный совпавший домен
-// выигрывает, и у своего домена это домен vpnlock.
+// выигрывает, и у своего домена это домен appguard.
 func (r Resolved) Set(domains []string) (skipped []string, err error) {
 	if len(domains) == 0 {
 		return nil, r.Clear()

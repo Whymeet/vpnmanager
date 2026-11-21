@@ -1,4 +1,4 @@
-﻿# Установка vpnlock на Windows — одной командой из клона, в обычном окне
+﻿# Установка appguard на Windows — одной командой из клона, в обычном окне
 # PowerShell:
 #
 #   powershell -NoProfile -ExecutionPolicy Bypass -File setup\windows\install.ps1
@@ -19,7 +19,7 @@ param([switch]$Elevated, [string]$Log)
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 
 $Repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$Exe = Join-Path $Repo 'bin\vpnlock.exe'
+$Exe = Join-Path $Repo 'bin\appguard.exe'
 $Self = Join-Path $Repo 'setup\windows\install.ps1'
 
 function Section([int]$n, [string]$msg) { Write-Host ''; Write-Host "[$n/5] $msg" }
@@ -31,14 +31,14 @@ if ($env:OS -ne 'Windows_NT') { Fail 'Это не Windows: здесь устан
 # Окно администратора с шага 4: ставит службу и оставляет вывод для исходного
 # окна. Строки ошибок программы приходят записями ошибок — в файл идёт их текст.
 if ($Elevated) {
-  Write-Host 'Ставлю службу vpnlock — окно закроется само.'
+  Write-Host 'Ставлю службу appguard — окно закроется само.'
   & $Exe install 2>&1 | ForEach-Object { "$_" } | Tee-Object -Variable lines | Out-Host
   $code = $LASTEXITCODE
   if ($Log) { $lines | Set-Content -Encoding UTF8 -Path $Log }
   exit $code
 }
 
-Write-Host "Установка vpnlock на этот компьютер. Клон: $Repo"
+Write-Host "Установка appguard на этот компьютер. Клон: $Repo"
 
 & (Join-Path $Repo 'setup\windows\prepare.ps1') -ForInstall
 if ($LASTEXITCODE -ne 0) { exit 1 }
@@ -52,7 +52,7 @@ if ($admin) {
 } else {
   Section 4 'Ставлю службу — Windows спросит разрешение'
   Step 'На вопрос «Разрешить этому приложению вносить изменения?» ответь «Да». Откроется окно установки и закроется само.'
-  $logFile = Join-Path ([IO.Path]::GetTempPath()) ('vpnlock-install-' + [Guid]::NewGuid() + '.log')
+  $logFile = Join-Path ([IO.Path]::GetTempPath()) ('appguard-install-' + [Guid]::NewGuid() + '.log')
   try {
     $p = Start-Process -FilePath 'powershell.exe' -Verb RunAs -Wait -PassThru -ErrorAction Stop -ArgumentList @(
       '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$Self`"", '-Elevated', '-Log', "`"$logFile`"")
@@ -71,14 +71,14 @@ if ($code -ne 0) {
 
 Section 5 'Проверяю службу'
 & $Exe status 2>&1 | ForEach-Object { Write-Host "  $_" }
-if ($LASTEXITCODE -ne 0) { Fail 'Служба не отвечает. Причина — в C:\ProgramData\vpnlock\logs\daemon.log.' }
+if ($LASTEXITCODE -ne 0) { Fail 'Служба не отвечает. Причина — в C:\ProgramData\appguard\logs\daemon.log.' }
 
 Write-Host ''
-Write-Host '✓ Готово: vpnlock установлен и стартует вместе с Windows.'
+Write-Host '✓ Готово: appguard установлен и стартует вместе с Windows.'
 Write-Host ''
 Write-Host 'Дальше — в новом окне PowerShell от имени администратора (меню «Пуск» → «PowerShell»,'
-Write-Host 'правой кнопкой — «Запуск от имени администратора»): в открытых окнах команды vpnlock ещё нет.'
-Write-Host '  vpnlock apply            программы и сервисы из конфига курса (configs\windows.conf)'
-Write-Host '  vpnlock remember <имя>   свой выход VPN: подключи VPN и запомни; повтори для каждого'
-Write-Host '  vpnlock rule mine        сервисы открыты только через твои выходы'
-Write-Host '  vpnlock                  меню: добавить приложение, правило, проверка'
+Write-Host 'правой кнопкой — «Запуск от имени администратора»): в открытых окнах команды appguard ещё нет.'
+Write-Host '  appguard apply            программы и сервисы из готового конфига (configs\windows.conf)'
+Write-Host '  appguard remember <имя>   свой выход VPN: подключи VPN и запомни; повтори для каждого'
+Write-Host '  appguard rule mine        сервисы открыты только через твои выходы'
+Write-Host '  appguard                  меню: добавить приложение, правило, проверка'

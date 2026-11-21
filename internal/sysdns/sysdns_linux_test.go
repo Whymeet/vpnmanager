@@ -36,12 +36,12 @@ func TestSetRoutesOnlyProtectedDomains(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{
-		"ip link add vpnlock0 type dummy",
-		"ip addr add 169.254.53.53/32 dev vpnlock0 scope global",
-		"ip link set vpnlock0 up",
-		"resolvectl dns vpnlock0 127.0.0.1:53535",
-		"resolvectl domain vpnlock0 ~anthropic.com ~openai.com",
-		"resolvectl default-route vpnlock0 false",
+		"ip link add appguard0 type dummy",
+		"ip addr add 169.254.53.53/32 dev appguard0 scope global",
+		"ip link set appguard0 up",
+		"resolvectl dns appguard0 127.0.0.1:53535",
+		"resolvectl domain appguard0 ~anthropic.com ~openai.com",
+		"resolvectl default-route appguard0 false",
 		"resolvectl flush-caches",
 	}
 	if !slices.Equal(*calls, want) {
@@ -65,18 +65,18 @@ func TestSetSpreadsLargeListOverLinks(t *testing.T) {
 			sizes[f[2]] = len(f) - 3
 		}
 	}
-	if sizes["vpnlock0"] != 256 || sizes["vpnlock1"] != 44 || len(sizes) != 2 {
+	if sizes["appguard0"] != 256 || sizes["appguard1"] != 44 || len(sizes) != 2 {
 		t.Errorf("%v", sizes)
 	}
 }
 
 func TestSetDropsLinksNoLongerNeeded(t *testing.T) {
 	r, calls := fake(true, true, nil)
-	r.Link = func(name string) bool { return name == "vpnlock0" || name == "vpnlock1" }
+	r.Link = func(name string) bool { return name == "appguard0" || name == "appguard1" }
 	if _, err := r.Set([]string{"openai.com"}); err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Contains(*calls, "ip link del vpnlock1") || slices.Contains(*calls, "ip link del vpnlock0") {
+	if !slices.Contains(*calls, "ip link del appguard1") || slices.Contains(*calls, "ip link del appguard0") {
 		t.Errorf("%q", *calls)
 	}
 }
@@ -84,9 +84,9 @@ func TestSetDropsLinksNoLongerNeeded(t *testing.T) {
 func TestSetWaitsForResolvedToSeeTheLink(t *testing.T) {
 	left := 3
 	r, calls := fake(true, true, func(call string) error {
-		if strings.Contains(call, "dns vpnlock0") && left > 0 {
+		if strings.Contains(call, "dns appguard0") && left > 0 {
 			left--
-			return errors.New("Link vpnlock0 not known")
+			return errors.New("Link appguard0 not known")
 		}
 		return nil
 	})
@@ -122,7 +122,7 @@ func TestNoDomainsLeaveNoLink(t *testing.T) {
 	if _, err := r.Set(nil); err != nil {
 		t.Fatal(err)
 	}
-	if !slices.Equal(*calls, []string{"ip link del vpnlock0"}) {
+	if !slices.Equal(*calls, []string{"ip link del appguard0"}) {
 		t.Errorf("%q", *calls)
 	}
 	r, calls = fake(true, false, nil)

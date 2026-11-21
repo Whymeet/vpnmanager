@@ -11,15 +11,15 @@ import (
 	"sync"
 	"time"
 
-	"vpnlock/internal/catalog"
-	"vpnlock/internal/config"
-	"vpnlock/internal/core"
-	"vpnlock/internal/enforce"
-	"vpnlock/internal/exitcheck"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/journal"
-	"vpnlock/internal/learn"
-	"vpnlock/internal/resolver"
+	"appguard/internal/catalog"
+	"appguard/internal/config"
+	"appguard/internal/core"
+	"appguard/internal/enforce"
+	"appguard/internal/exitcheck"
+	"appguard/internal/ipc"
+	"appguard/internal/journal"
+	"appguard/internal/learn"
+	"appguard/internal/resolver"
 )
 
 // checkTimeout — сколько ждать одну проверку выхода: оба источника с запасным.

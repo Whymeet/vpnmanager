@@ -3,19 +3,19 @@ package main
 import (
 	"path/filepath"
 
-	"vpnlock/internal/cli"
-	"vpnlock/internal/dnswatch"
-	"vpnlock/internal/enforce"
-	"vpnlock/internal/install"
-	"vpnlock/internal/paths"
-	"vpnlock/internal/service"
+	"appguard/internal/cli"
+	"appguard/internal/dnswatch"
+	"appguard/internal/enforce"
+	"appguard/internal/install"
+	"appguard/internal/paths"
+	"appguard/internal/service"
 )
 
 // setupDir — папка установочных скриптов этой системы в клоне.
 const setupDir = "macos"
 
 func installer(L paths.Layout) *install.Installer {
-	return &install.Installer{Layout: L, Launchd: install.Launchctl{}, Agent: sudoAgent()}
+	return &install.Installer{Layout: L, Launchd: install.Launchctl{}, Agent: sudoAgent(), Legacy: legacy(L)}
 }
 
 // enforcer — исполнитель правил с токеном включения pf в каталоге службы.

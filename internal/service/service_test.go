@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/core"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/paths"
-	"vpnlock/internal/service"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/core"
+	"appguard/internal/ipc"
+	"appguard/internal/paths"
+	"appguard/internal/service"
+	"appguard/internal/service/servicetest"
 )
 
 // deps — адаптеры для службы, которая должна отказаться стартовать.

@@ -1,6 +1,6 @@
 :; exec bash "$(dirname "$0")/setup/install.sh" "$@"
 @echo off
-rem Установка vpnlock одним файлом на все системы.
+rem Установка appguard одним файлом на все системы.
 rem   macOS:   ./install.cmd в Терминале
 rem   Linux:   ./install.cmd в терминале
 rem   Windows: двойной щелчок в Проводнике или .\install.cmd в PowerShell

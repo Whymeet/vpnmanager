@@ -26,12 +26,12 @@ const (
 
 // marker — значение Comment у наших правил: по нему удаление узнаёт своё и не
 // трогает чужое.
-const marker = "vpnlock"
+const marker = "appguard"
 
 // nrptUseServers — ConfigOptions «спрашивать указанные серверы DNS».
 const nrptUseServers = 0x8
 
-// NRPT — правила vpnlock в таблице политики разрешения имён.
+// NRPT — правила appguard в таблице политики разрешения имён.
 type NRPT struct {
 	// Server — где слушает резолвер службы. Порта NRPT не знает: только 53.
 	Server netip.Addr
@@ -94,7 +94,7 @@ func (n NRPT) Set(domains []string) (skipped []string, err error) {
 	return skipped, nil
 }
 
-// Clear убирает все правила vpnlock.
+// Clear убирает все правила appguard.
 func (n NRPT) Clear() error {
 	root, err := registry.OpenKey(registry.LOCAL_MACHINE, nrptLocal, registry.ALL_ACCESS)
 	if errors.Is(err, registry.ErrNotExist) {
@@ -194,7 +194,7 @@ func policyRules() bool {
 // ruleKey — имя раздела правила номер i: постоянный GUID, как у правил,
 // которые заводит сама Windows.
 func ruleKey(i int) string {
-	sum := sha256.Sum256([]byte("vpnlock nrpt " + strconv.Itoa(i)))
+	sum := sha256.Sum256([]byte("appguard nrpt " + strconv.Itoa(i)))
 	g := windows.GUID{
 		Data1: binary.LittleEndian.Uint32(sum[0:4]),
 		Data2: binary.LittleEndian.Uint16(sum[4:6]),

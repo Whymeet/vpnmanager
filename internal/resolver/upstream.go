@@ -12,7 +12,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"vpnlock/internal/bind"
+	"appguard/internal/bind"
 )
 
 // DoH — DNS поверх HTTPS (RFC 8484). Адрес — по IP, чтобы самому DoH не

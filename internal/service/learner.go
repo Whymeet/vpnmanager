@@ -10,11 +10,11 @@ import (
 	"time"
 	"unicode"
 
-	"vpnlock/internal/config"
-	"vpnlock/internal/core"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/learn"
-	"vpnlock/internal/procs"
+	"appguard/internal/config"
+	"appguard/internal/core"
+	"appguard/internal/ipc"
+	"appguard/internal/learn"
+	"appguard/internal/procs"
 )
 
 // Scanner — процессы и соединения приложений.

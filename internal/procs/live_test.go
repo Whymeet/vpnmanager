@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/apps"
+	"appguard/internal/apps"
 )
 
 func TestLiveScanNotion(t *testing.T) {

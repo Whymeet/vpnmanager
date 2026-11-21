@@ -8,8 +8,8 @@ import (
 	"net/netip"
 	"time"
 
-	"vpnlock/internal/bind"
-	"vpnlock/internal/core"
+	"appguard/internal/bind"
+	"appguard/internal/core"
 )
 
 // Bound — запросы через интерфейс туннеля. Привязка сокета к интерфейсу

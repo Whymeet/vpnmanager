@@ -1,6 +1,6 @@
 // Package notify — системные уведомления пользователю. На Windows у службы
 // своего сеанса нет: уведомления показывает агент в сеансе пользователя
-// (vpnlock notify-agent), получая их от службы.
+// (appguard notify-agent), получая их от службы.
 package notify
 
 import (
@@ -22,14 +22,14 @@ import (
 const timeout = 15 * time.Second
 
 // toastScript показывает уведомление Windows от имени PowerShell (своего
-// идентификатора приложения у vpnlock нет). Текст приходит переменной
+// идентификатора приложения у appguard нет). Текст приходит переменной
 // окружения, а не вклеивается в скрипт: кавычки в причине ничего не сломают.
 const toastScript = `$ErrorActionPreference = 'Stop'
 [void][Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime]
 [void][Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime]
 $x = New-Object Windows.Data.Xml.Dom.XmlDocument
-$x.LoadXml('<toast><visual><binding template="ToastGeneric"><text>vpnlock</text><text></text></binding></visual></toast>')
-[void]$x.GetElementsByTagName('text').Item(1).AppendChild($x.CreateTextNode($env:VPNLOCK_NOTE))
+$x.LoadXml('<toast><visual><binding template="ToastGeneric"><text>appguard</text><text></text></binding></visual></toast>')
+[void]$x.GetElementsByTagName('text').Item(1).AppendChild($x.CreateTextNode($env:APPGUARD_NOTE))
 $app = '{1AC14E77-02E7-4E5D-B744-2EB1AE5198B7}\WindowsPowerShell\v1.0\powershell.exe'
 [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier($app).Show([Windows.UI.Notifications.ToastNotification]::new($x))
 `
@@ -44,7 +44,7 @@ func Toast(text string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	cmd := exec.CommandContext(ctx, ps, "-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-EncodedCommand", encode(toastScript))
-	cmd.Env = append(os.Environ(), "VPNLOCK_NOTE="+text)
+	cmd.Env = append(os.Environ(), "APPGUARD_NOTE="+text)
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true, CreationFlags: windows.CREATE_NO_WINDOW}
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("уведомление: %w: %s", err, out)

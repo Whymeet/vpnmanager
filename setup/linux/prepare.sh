@@ -1,5 +1,5 @@
 #!/bin/bash
-# Подготовка к установке vpnlock на Linux. Запускается БЕЗ sudo — от имени
+# Подготовка к установке appguard на Linux. Запускается БЕЗ sudo — от имени
 # человека: её выполняет установка (./install.cmd) первыми тремя шагами, а Claude
 # Code может запустить её сам, без пароля:
 #
@@ -10,10 +10,10 @@
 #    и скрипт останавливается, ничего не скачав и не собрав.
 # 2. Находит Go не старше версии из go.mod. Если его нет — ставит Go в .toolchain/
 #    клона: без пароля и без изменений в системе, удаляется вместе с клоном.
-# 3. Собирает инструмент в bin/vpnlock.
+# 3. Собирает инструмент в bin/appguard.
 #
 # С --install её запускает установка: шаги нумеруются из шести, дальше служба.
-# С --update — «sudo vpnlock update», уже от имени человека; новую версию ставит
+# С --update — «sudo appguard update», уже от имени человека; новую версию ставит
 # сама команда.
 set -euo pipefail
 
@@ -55,7 +55,7 @@ case "$(uname -m)" in
   *) fail "Архитектура $(uname -m) не поддерживается: нужна x86_64 или aarch64." ;;
 esac
 
-[ -d /run/systemd/system ] || fail "Нет systemd: vpnlock работает службой systemd, а эта система (или контейнер) запущена без него."
+[ -d /run/systemd/system ] || fail "Нет systemd: appguard работает службой systemd, а эта система (или контейнер) запущена без него."
 
 kernel="$(uname -r)"
 kernel="${kernel%%-*}"
@@ -63,12 +63,12 @@ version_ge "$kernel" "5.15" || fail "Нужно ядро Linux 5.15 или но�
 
 user="$(id -un)"
 is_admin=
-# По имени, а не по текущему процессу: «sudo vpnlock update» запускает подготовку
+# По имени, а не по текущему процессу: «sudo appguard update» запускает подготовку
 # без дополнительных групп, а права у человека от этого не исчезают.
 for group in $(id -nG "$user"); do
   case "$group" in sudo | wheel | admin) is_admin=1 ;; esac
 done
-[ -n "$is_admin" ] || fail "У пользователя $user нет прав администратора (группы sudo, wheel или admin), поэтому установить vpnlock нельзя. В системе ничего не изменено."
+[ -n "$is_admin" ] || fail "У пользователя $user нет прав администратора (группы sudo, wheel или admin), поэтому установить appguard нельзя. В системе ничего не изменено."
 
 ok "Linux $kernel, $arch, пользователь $user — администратор"
 
@@ -120,17 +120,17 @@ ok "$(cd / && GOTOOLCHAIN=local "$GO" env GOVERSION): $GO"
 # Всё нужное для сборки лежит в клоне (vendor/), так что сеть не нужна.
 # GOENV=off — чужие настройки Go пользователя не влияют на сборку; CGO_ENABLED=0 —
 # не нужен компилятор C. -trimpath — в файл не попадают пути клона.
-section "Собираю vpnlock"
+section "Собираю appguard"
 [ -d "$TOOLCHAIN/cache" ] || step "Первая сборка занимает пару минут, следующие — секунды"
 mkdir -p "$REPO/bin"
 (
   cd "$REPO"
   GOENV=off GOTOOLCHAIN=local GOFLAGS=-mod=vendor CGO_ENABLED=0 GOOS=linux GOARCH="$arch" \
     GOPATH="$TOOLCHAIN/gopath" GOCACHE="$TOOLCHAIN/cache" \
-    "$GO" build -trimpath -ldflags="-s -w" -o "$REPO/bin/vpnlock" ./cmd/vpnlock
+    "$GO" build -trimpath -ldflags="-s -w" -o "$REPO/bin/appguard" ./cmd/appguard
 ) || fail "Сборка не прошла — вывод выше. В системе ничего не изменено."
-built="$("$REPO/bin/vpnlock" version)" || fail "Собранный bin/vpnlock не запускается."
-ok "vpnlock $built — $REPO/bin/vpnlock"
+built="$("$REPO/bin/appguard" version)" || fail "Собранный bin/appguard не запускается."
+ok "appguard $built — $REPO/bin/appguard"
 
 [ -z "$MODE" ] || exit 0
 

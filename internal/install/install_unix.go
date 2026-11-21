@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 )
 
-// commandFree — место команды vpnlock свободно или уже занято ею. Чужой файл с
+// commandFree — место команды appguard свободно или уже занято ею. Чужой файл с
 // тем же именем установка не перезаписывает.
 func (in *Installer) commandFree() error {
 	ours, err := in.commandIsOurs()
@@ -18,12 +18,12 @@ func (in *Installer) commandFree() error {
 	case ours, errors.Is(err, fs.ErrNotExist):
 		return nil
 	case err == nil:
-		return fmt.Errorf("%s уже есть, и это не команда vpnlock. Убери его и запусти установку ещё раз — в системе ничего не изменено", in.Layout.CommandLink)
+		return fmt.Errorf("%s уже есть, и это не команда appguard. Убери его и запусти установку ещё раз — в системе ничего не изменено", in.Layout.CommandLink)
 	}
 	return err
 }
 
-// linkCommand кладёт команду vpnlock в /usr/local/bin.
+// linkCommand кладёт команду appguard в /usr/local/bin.
 func (in *Installer) linkCommand() error {
 	if ours, _ := in.commandIsOurs(); ours {
 		return nil

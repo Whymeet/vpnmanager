@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/core"
+	"appguard/internal/core"
 )
 
 // Вывод `scutil --proxy` у клиента вроде ClashX: HTTP и HTTPS на одном порту,

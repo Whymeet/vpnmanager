@@ -1,4 +1,4 @@
-﻿# Подготовка к установке vpnlock на Windows. Запускается БЕЗ прав
+﻿# Подготовка к установке appguard на Windows. Запускается БЕЗ прав
 # администратора: её выполняет установка (setup\windows\install.ps1) первыми
 # тремя шагами, а Claude Code может запустить её сам:
 #
@@ -10,10 +10,10 @@
 # 2. Находит Go не старше версии из go.mod. Если его нет — ставит Go в
 #    .toolchain\ клона: без прав администратора и без изменений в системе,
 #    удаляется вместе с клоном.
-# 3. Собирает инструмент в bin\vpnlock.exe.
+# 3. Собирает инструмент в bin\appguard.exe.
 #
 # С -ForInstall её запускает установка: шаги нумеруются из пяти, дальше служба.
-# С -ForUpdate — «vpnlock update» из PowerShell от имени администратора; новую
+# С -ForUpdate — «appguard update» из PowerShell от имени администратора; новую
 # версию ставит сама команда.
 #
 # Файл в UTF-8 с BOM: без BOM Windows PowerShell 5.1 читает его в кодировке
@@ -53,7 +53,7 @@ if (([Version]$os.Version).Major -lt 10) { Fail "Нужна Windows 10 или 11
 # пользователя её нет вовсе. SID одинаков на любом языке Windows.
 $user = [Security.Principal.WindowsIdentity]::GetCurrent().Name
 if (-not ((whoami /groups) -match 'S-1-5-32-544')) {
-  Fail "У пользователя $user нет прав администратора, поэтому установить vpnlock нельзя. В системе ничего не изменено. Нужна учётная запись администратора: Параметры → Учётные записи."
+  Fail "У пользователя $user нет прав администратора, поэтому установить appguard нельзя. В системе ничего не изменено. Нужна учётная запись администратора: Параметры → Учётные записи."
 }
 
 # Сборка под родную архитектуру, даже если PowerShell запущен в эмуляции.
@@ -96,7 +96,7 @@ function FindGo {
 
 function InstallGo {
   Step "Go $need+ не найден — скачиваю Go $GoVersion (около 80 МБ) в ${Toolchain}: он нужен только для сборки, права администратора не нужны"
-  $tmp = Join-Path ([IO.Path]::GetTempPath()) ('vpnlock-go-' + [Guid]::NewGuid())
+  $tmp = Join-Path ([IO.Path]::GetTempPath()) ('appguard-go-' + [Guid]::NewGuid())
   New-Item -ItemType Directory -Path $tmp | Out-Null
   try {
     $zip = Join-Path $tmp 'go.zip'
@@ -141,9 +141,9 @@ Ok "go$(GoVersionOf $Go): $Go"
 # Всё нужное для сборки лежит в клоне (vendor\), так что сеть не нужна.
 # GOENV=off — чужие настройки Go пользователя не влияют на сборку; CGO_ENABLED=0 —
 # не нужен компилятор C. -trimpath — в файл не попадают пути клона.
-Section 'Собираю vpnlock'
+Section 'Собираю appguard'
 if (-not (Test-Path (Join-Path $Toolchain 'cache'))) { Step 'Первая сборка занимает пару минут, следующие — секунды' }
-$exe = Join-Path $Repo 'bin\vpnlock.exe'
+$exe = Join-Path $Repo 'bin\appguard.exe'
 New-Item -ItemType Directory -Force -Path (Join-Path $Repo 'bin') | Out-Null
 $env:GOENV = 'off'
 $env:GOTOOLCHAIN = 'local'
@@ -153,19 +153,19 @@ $env:GOOS = 'windows'
 $env:GOARCH = $arch
 $env:GOPATH = Join-Path $Toolchain 'gopath'
 $env:GOCACHE = Join-Path $Toolchain 'cache'
-# vpnlockw.exe — тот же vpnlock без окна консоли: задачи планировщика
+# appguardw.exe — тот же appguard без окна консоли: задачи планировщика
 # (уведомления, обновление каталога) запускают его, и окна не мигают.
-$quietExe = Join-Path $Repo 'bin\vpnlockw.exe'
+$quietExe = Join-Path $Repo 'bin\appguardw.exe'
 Push-Location $Repo
 try {
-  & $Go build -trimpath '-ldflags=-s -w' -o $exe ./cmd/vpnlock
-  if ($LASTEXITCODE -eq 0) { & $Go build -trimpath '-ldflags=-s -w -H=windowsgui' -o $quietExe ./cmd/vpnlock }
+  & $Go build -trimpath '-ldflags=-s -w' -o $exe ./cmd/appguard
+  if ($LASTEXITCODE -eq 0) { & $Go build -trimpath '-ldflags=-s -w -H=windowsgui' -o $quietExe ./cmd/appguard }
 } finally { Pop-Location }
 if ($LASTEXITCODE -ne 0) { Fail 'Сборка не прошла — вывод выше. В системе ничего не изменено.' }
 $built = & $exe version
-if ($LASTEXITCODE -ne 0) { Fail 'Собранный bin\vpnlock.exe не запускается.' }
+if ($LASTEXITCODE -ne 0) { Fail 'Собранный bin\appguard.exe не запускается.' }
 
-Ok "vpnlock $built — $exe и vpnlockw.exe"
+Ok "appguard $built — $exe и appguardw.exe"
 
 if ($ForUpdate -or $ForInstall) { exit 0 }
 

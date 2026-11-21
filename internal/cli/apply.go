@@ -12,11 +12,11 @@ import (
 	"runtime"
 	"strings"
 
-	"vpnlock/internal/core"
-	"vpnlock/internal/ipc"
+	"appguard/internal/core"
+	"appguard/internal/ipc"
 )
 
-// apply — `vpnlock apply [файл]`: применить конфиг. Без файла — конфиг своей
+// apply — `appguard apply [файл]`: применить конфиг. Без файла — конфиг своей
 // системы из клона: configs/macos.conf, configs/linux.conf или
 // configs/windows.conf. Файл сначала проверяется целиком, потом применяется по
 // строке; первая неудача останавливает команду. Конфиг только добавляет:
@@ -24,17 +24,17 @@ import (
 // можно сколько угодно раз: что уже настроено, остаётся как есть.
 func apply(env Env, args []string) int {
 	if len(args) > 1 {
-		fmt.Fprintln(env.Err, "Укажи один конфиг: vpnlock apply [файл] — без файла берётся конфиг этой системы из клона.")
+		fmt.Fprintln(env.Err, "Укажи один конфиг: appguard apply [файл] — без файла берётся конфиг этой системы из клона.")
 		return 2
 	}
 	switch {
 	case runtime.GOOS == "windows" && !env.Root:
-		fmt.Fprintln(env.Err, "Применить конфиг можно только из PowerShell, открытого от имени администратора: в меню «Пуск» найди «PowerShell», правой кнопкой — «Запуск от имени администратора», и повтори там vpnlock apply. Ничего не изменено.")
+		fmt.Fprintln(env.Err, "Применить конфиг можно только из PowerShell, открытого от имени администратора: в меню «Пуск» найди «PowerShell», правой кнопкой — «Запуск от имени администратора», и повтори там appguard apply. Ничего не изменено.")
 		return 1
 	case runtime.GOOS != "windows" && env.Root:
 		// Под sudo PATH и домашняя папка — root: консольные программы
 		// человека не нашлись бы и молча пропустились.
-		fmt.Fprintln(env.Err, "Запусти без sudo, от своей учётной записи: vpnlock apply. Прав администратора для этого хватает. Ничего не изменено.")
+		fmt.Fprintln(env.Err, "Запусти без sudo, от своей учётной записи: appguard apply. Прав администратора для этого хватает. Ничего не изменено.")
 		return 1
 	}
 	file, ok := configFile(env, args)
@@ -47,7 +47,7 @@ func apply(env Env, args []string) int {
 		return 1
 	}
 	if len(data) > 1<<20 {
-		fmt.Fprintf(env.Err, "%s больше 1 МБ — это не конфиг vpnlock. Ничего не изменено.\n", file)
+		fmt.Fprintf(env.Err, "%s больше 1 МБ — это не конфиг appguard. Ничего не изменено.\n", file)
 		return 1
 	}
 	lines, err := parseConfig(data)
@@ -80,7 +80,7 @@ func apply(env Env, args []string) int {
 	printIndented(env, out.String(), "  ")
 	fmt.Fprintln(env.Out)
 	if skipped > 0 {
-		fmt.Fprintf(env.Out, "✓ Готово. Пропущено: %d %s — на этом компьютере их нет; поставишь — запусти vpnlock apply ещё раз.\n",
+		fmt.Fprintf(env.Out, "✓ Готово. Пропущено: %d %s — на этом компьютере их нет; поставишь — запусти appguard apply ещё раз.\n",
 			skipped, core.Plural(skipped, "программа", "программы", "программ"))
 	} else {
 		fmt.Fprintln(env.Out, "✓ Готово: конфиг применён.")
@@ -98,13 +98,13 @@ func nextSteps(env Env, st *ipc.Status) {
 	case len(st.Exits) == 0:
 		fmt.Fprintln(env.Out, `
 Дальше — твои выходы VPN, чтобы сервисы открывались только через них:
-  vpnlock remember <имя>            подключи VPN и запомни его выход; повтори для каждого VPN
-  vpnlock remember <имя> <адрес>    или по адресу выхода, без подключения (адрес, который видят сайты)`)
+  appguard remember <имя>            подключи VPN и запомни его выход; повтори для каждого VPN
+  appguard remember <имя> <адрес>    или по адресу выхода, без подключения (адрес, который видят сайты)`)
 		if st.Rule != core.RuleMine {
-			fmt.Fprintln(env.Out, "  vpnlock rule mine                 затем правило «только мои выходы»")
+			fmt.Fprintln(env.Out, "  appguard rule mine                 затем правило «только мои выходы»")
 		}
 	case st.Rule != core.RuleMine:
-		fmt.Fprintln(env.Out, "\nЧтобы сервисы открывались только через твои выходы: vpnlock rule mine")
+		fmt.Fprintln(env.Out, "\nЧтобы сервисы открывались только через твои выходы: appguard rule mine")
 	}
 }
 
@@ -120,7 +120,7 @@ func configFile(env Env, args []string) (string, bool) {
 	}
 	clone, ok := findClone(env, nil)
 	if !ok {
-		fmt.Fprintln(env.Err, "Не нашёл клон vpnlock: запусти команду из папки клона или укажи конфиг — vpnlock apply <файл>. Ничего не изменено.")
+		fmt.Fprintln(env.Err, "Не нашёл клон appguard: запусти команду из папки клона или укажи конфиг — appguard apply <файл>. Ничего не изменено.")
 		return "", false
 	}
 	file := filepath.Join(clone, "configs", configName(runtime.GOOS))
@@ -207,7 +207,7 @@ func parseConfig(data []byte) ([]confLine, error) {
 	return lines, nil
 }
 
-// applyLine выполняет строку конфига той же командой vpnlock, что набрал бы
+// applyLine выполняет строку конфига той же командой appguard, что набрал бы
 // человек, и показывает её вывод с отступом. skipped — программы на этом
 // компьютере нет.
 func applyLine(env Env, dir string, l confLine) (code int, skipped bool) {
@@ -222,7 +222,7 @@ func applyLine(env Env, dir string, l confLine) (code int, skipped bool) {
 	default:
 		cmd = append([]string{l.key}, l.args...)
 	}
-	fmt.Fprintf(env.Out, "  · vpnlock %s\n", shellJoin(cmd))
+	fmt.Fprintf(env.Out, "  · appguard %s\n", shellJoin(cmd))
 	var out bytes.Buffer
 	code = Run(cmd, captured(env, &out))
 	printIndented(env, out.String(), "      ")
@@ -247,7 +247,7 @@ func applyApp(env Env, dir, arg string) (code int, skipped bool) {
 		fmt.Fprintf(env.Out, "  ! %s — нет на этом компьютере, пропускаю\n", arg)
 		return 0, true
 	}
-	fmt.Fprintf(env.Out, "  · vpnlock add %s\n", shellJoin([]string{target}))
+	fmt.Fprintf(env.Out, "  · appguard add %s\n", shellJoin([]string{target}))
 	if !ok {
 		printIndented(env, out.String(), "      ")
 		return 1, false

@@ -1,7 +1,7 @@
 //go:build live && darwin
 
 // Живая проверка: tools/go test -tags live -v -run LiveNotification ./internal/notify
-// Показывает на экране одно уведомление vpnlock.
+// Показывает на экране одно уведомление appguard.
 
 package notify
 

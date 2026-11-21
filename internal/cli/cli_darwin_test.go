@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/apps"
-	"vpnlock/internal/cli"
-	"vpnlock/internal/core"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/paths"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/apps"
+	"appguard/internal/cli"
+	"appguard/internal/core"
+	"appguard/internal/ipc"
+	"appguard/internal/paths"
+	"appguard/internal/service/servicetest"
 )
 
 type run struct {
@@ -23,7 +23,7 @@ type run struct {
 	out, err string
 }
 
-func vpnlock(env cli.Env, input string, args ...string) run {
+func appguard(env cli.Env, input string, args ...string) run {
 	var out, errb bytes.Buffer
 	env.In, env.Out, env.Err = strings.NewReader(input), &out, &errb
 	if env.Version == "" {
@@ -41,7 +41,7 @@ func emptyLayout(t *testing.T) paths.Layout {
 }
 
 func TestStatusWithoutInstallation(t *testing.T) {
-	r := vpnlock(cli.Env{Layout: emptyLayout(t)}, "", "status")
+	r := appguard(cli.Env{Layout: emptyLayout(t)}, "", "status")
 	if r.code != 1 || !strings.Contains(r.out, "не установлен") || !strings.Contains(r.out, "setup/README.md") {
 		t.Fatalf("%+v", r)
 	}
@@ -52,12 +52,12 @@ func TestStatusWhenServiceIsSilent(t *testing.T) {
 	os.MkdirAll(filepath.Dir(L.Plist), 0o755)
 	os.WriteFile(L.Plist, []byte("plist"), 0o644)
 
-	r := vpnlock(cli.Env{Layout: L}, "", "status")
+	r := appguard(cli.Env{Layout: L}, "", "status")
 	if r.code != 1 || !strings.Contains(r.out, "не отвечает — защита держится") || !strings.Contains(r.out, L.LogFile) {
 		t.Fatalf("%+v", r)
 	}
 	// Меню над пунктами пишет то же.
-	r = vpnlock(cli.Env{Layout: L, Interactive: true}, "\x1b[6~\r")
+	r = appguard(cli.Env{Layout: L, Interactive: true}, "\x1b[6~\r")
 	if !strings.Contains(r.out, "служба не отвечает — защита держится") {
 		t.Fatalf("меню: %+v", r)
 	}
@@ -66,7 +66,7 @@ func TestStatusWhenServiceIsSilent(t *testing.T) {
 func TestStatusShowsRunningServiceAndVersion(t *testing.T) {
 	s := servicetest.Start(t, "", servicetest.Fakes{})
 
-	r := vpnlock(cli.Env{Layout: s.Layout}, "", "status")
+	r := appguard(cli.Env{Layout: s.Layout}, "", "status")
 	if r.code != 0 || !strings.Contains(r.out, "Служба: работает с ") || !strings.Contains(r.out, "версия "+servicetest.Version) {
 		t.Fatalf("%+v", r)
 	}
@@ -74,7 +74,7 @@ func TestStatusShowsRunningServiceAndVersion(t *testing.T) {
 		t.Fatalf("версии совпадают, а статус пишет о разнице: %s", r.out)
 	}
 
-	r = vpnlock(cli.Env{Layout: s.Layout, Version: "10.0.0"}, "", "status")
+	r = appguard(cli.Env{Layout: s.Layout, Version: "10.0.0"}, "", "status")
 	if !strings.Contains(r.out, "У этой команды версия 10.0.0") {
 		t.Fatalf("статус не заметил, что команда другой версии: %s", r.out)
 	}
@@ -84,15 +84,15 @@ func TestUninstallAsksForConfirmation(t *testing.T) {
 	inst := &servicetest.Installation{}
 	s := servicetest.Start(t, "", servicetest.Fakes{Accounts: &servicetest.Accounts{Admin: true}, Installation: inst})
 
-	r := vpnlock(cli.Env{Layout: s.Layout}, "", "uninstall")
+	r := appguard(cli.Env{Layout: s.Layout}, "", "uninstall")
 	if r.code != 1 || !strings.Contains(r.err, "подтвердить") {
 		t.Fatalf("без терминала и --yes: %+v", r)
 	}
-	r = vpnlock(cli.Env{Layout: s.Layout, Interactive: true}, "нет\n", "uninstall")
+	r = appguard(cli.Env{Layout: s.Layout, Interactive: true}, "нет\n", "uninstall")
 	if r.code != 1 || !strings.Contains(r.out, "домашнего адреса") || !strings.Contains(r.out, "Отменено") {
 		t.Fatalf("отказ от удаления: %+v", r)
 	}
-	r = vpnlock(cli.Env{Layout: s.Layout}, "", "uninstall", "Notion")
+	r = appguard(cli.Env{Layout: s.Layout}, "", "uninstall", "Notion")
 	if r.code != 2 {
 		t.Fatalf("лишний аргумент: %+v", r)
 	}
@@ -105,7 +105,7 @@ func TestUninstallByNonAdminIsRefused(t *testing.T) {
 	inst := &servicetest.Installation{}
 	s := servicetest.Start(t, "", servicetest.Fakes{Accounts: &servicetest.Accounts{Admin: false}, Installation: inst})
 
-	r := vpnlock(cli.Env{Layout: s.Layout, Interactive: true}, "да\n", "uninstall")
+	r := appguard(cli.Env{Layout: s.Layout, Interactive: true}, "да\n", "uninstall")
 	if r.code != 1 || !strings.Contains(r.err, "только администратор") || !strings.Contains(r.err, "student") {
 		t.Fatalf("%+v", r)
 	}
@@ -118,8 +118,8 @@ func TestUninstallByAdminWithoutSudo(t *testing.T) {
 	inst := &servicetest.Installation{}
 	s := servicetest.Start(t, "", servicetest.Fakes{Accounts: &servicetest.Accounts{Admin: true}, Installation: inst})
 
-	r := vpnlock(cli.Env{Layout: s.Layout, Interactive: true}, "да\n", "uninstall")
-	if r.code != 0 || !strings.Contains(r.out, "vpnlock удалён") {
+	r := appguard(cli.Env{Layout: s.Layout, Interactive: true}, "да\n", "uninstall")
+	if r.code != 0 || !strings.Contains(r.out, "appguard удалён") {
 		t.Fatalf("%+v", r)
 	}
 	if !inst.Removed.Load() || !inst.Stopped.Load() {
@@ -135,27 +135,27 @@ func TestUninstallWithSudoWorksWithoutService(t *testing.T) {
 	os.MkdirAll(L.AppDir, 0o755)
 	removed := false
 
-	r := vpnlock(cli.Env{Layout: L, Root: true, Uninstall: func() error { removed = true; return nil }}, "", "uninstall", "--yes")
+	r := appguard(cli.Env{Layout: L, Root: true, Uninstall: func() error { removed = true; return nil }}, "", "uninstall", "--yes")
 	if r.code != 0 || !removed {
 		t.Fatalf("%+v, снято: %v", r, removed)
 	}
 
-	r = vpnlock(cli.Env{Layout: L}, "", "uninstall", "--yes")
-	if r.code != 1 || !strings.Contains(r.err, "sudo vpnlock uninstall") {
+	r = appguard(cli.Env{Layout: L}, "", "uninstall", "--yes")
+	if r.code != 1 || !strings.Contains(r.err, "sudo appguard uninstall") {
 		t.Fatalf("без службы и без sudo: %+v", r)
 	}
 }
 
 func TestInstallNeedsRoot(t *testing.T) {
 	called := false
-	r := vpnlock(cli.Env{Layout: emptyLayout(t), Install: func() (string, error) { called = true; return "", nil }}, "", "install")
+	r := appguard(cli.Env{Layout: emptyLayout(t), Install: func() (string, error) { called = true; return "", nil }}, "", "install")
 	if r.code != 1 || called || !strings.Contains(r.err, "setup/macos/install.sh") || !strings.Contains(r.err, "ничего не изменено") {
 		t.Fatalf("%+v, установка вызвана: %v", r, called)
 	}
 }
 
 func TestUnknownCommand(t *testing.T) {
-	r := vpnlock(cli.Env{Layout: emptyLayout(t)}, "", "пауза")
+	r := appguard(cli.Env{Layout: emptyLayout(t)}, "", "пауза")
 	if r.code != 2 || !strings.Contains(r.err, "Нет команды «пауза»") {
 		t.Fatalf("%+v", r)
 	}
@@ -165,30 +165,30 @@ func TestCommandsAreEnglishOnly(t *testing.T) {
 	s := servicetest.Start(t, "", servicetest.Fakes{Accounts: &servicetest.Accounts{Admin: true}})
 	env := cli.Env{Layout: s.Layout}
 	for _, args := range [][]string{{"статус"}, {"журнал"}, {"удалить", "--yes"}} {
-		if r := vpnlock(env, "", args...); r.code != 2 || !strings.Contains(r.err, "Нет команды «"+args[0]+"»") {
+		if r := appguard(env, "", args...); r.code != 2 || !strings.Contains(r.err, "Нет команды «"+args[0]+"»") {
 			t.Fatalf("%v: %+v", args, r)
 		}
 	}
 	for _, args := range [][]string{{"rule", "мои"}, {"notifications", "выкл"}, {"catalog", "загрузить"}} {
-		if r := vpnlock(env, "", args...); r.code != 2 {
+		if r := appguard(env, "", args...); r.code != 2 {
 			t.Fatalf("%v: %+v", args, r)
 		}
 	}
-	if r := vpnlock(env, "", "help"); !strings.Contains(r.out, "vpnlock rule [any|mine]") || strings.Contains(r.out, "vpnlock статус") {
+	if r := appguard(env, "", "help"); !strings.Contains(r.out, "appguard rule [any|mine]") || strings.Contains(r.out, "appguard статус") {
 		t.Fatalf("справка: %s", r.out)
 	}
 }
 
 func TestStatusShowsVPN(t *testing.T) {
 	s := servicetest.Start(t, "", servicetest.Fakes{})
-	if r := vpnlock(cli.Env{Layout: s.Layout}, "", "status"); !strings.Contains(r.out, "VPN: нет") {
+	if r := appguard(cli.Env{Layout: s.Layout}, "", "status"); !strings.Contains(r.out, "VPN: нет") {
 		t.Fatalf("без туннелей: %s", r.out)
 	}
 	s.Web.Set("185.1.2.3", "DE", "DE")
 	s.Network.Set(servicetest.Tunnel("utun11", "10.8.1.1"))
 	s.WaitStatus(t, 2*time.Second, func(st ipc.Status) bool { return len(st.Paths) == 1 && st.Paths[0].State == "verified" })
 
-	r := vpnlock(cli.Env{Layout: s.Layout}, "", "status")
+	r := appguard(cli.Env{Layout: s.Layout}, "", "status")
 	if !strings.Contains(r.out, "VPN: utun11 — выход 185.1.2.3, Германия — проверен") {
 		t.Fatalf("%s", r.out)
 	}
@@ -201,7 +201,7 @@ func TestCheckCommandReportsByItem(t *testing.T) {
 	os.WriteFile(filepath.Join(home, "Library/Application Support/Google/Chrome/Local State"),
 		[]byte(`{"dns_over_https":{"mode":"secure","templates":"https://dns.google/dns-query"}}`), 0o644)
 
-	r := vpnlock(cli.Env{Layout: s.Layout, Home: home}, "", "check")
+	r := appguard(cli.Env{Layout: s.Layout, Home: home}, "", "check")
 	for _, want := range []string{
 		"✓ Правила файрвола — на месте",
 		"! Выход — VPN выключен",
@@ -218,7 +218,7 @@ func TestCheckCommandReportsByItem(t *testing.T) {
 	}
 
 	os.WriteFile(filepath.Join(home, "Library/Application Support/Google/Chrome/Local State"), []byte(`{}`), 0o644)
-	if r := vpnlock(cli.Env{Layout: s.Layout, Home: home}, "", "check"); r.code != 0 || !strings.Contains(r.out, "Итог: всё в порядке.") {
+	if r := appguard(cli.Env{Layout: s.Layout, Home: home}, "", "check"); r.code != 0 || !strings.Contains(r.out, "Итог: всё в порядке.") {
 		t.Fatalf("%+v", r)
 	}
 }
@@ -226,19 +226,19 @@ func TestCheckCommandReportsByItem(t *testing.T) {
 func TestNotificationsCommand(t *testing.T) {
 	s := servicetest.Start(t, "", servicetest.Fakes{Accounts: &servicetest.Accounts{Admin: true}})
 	env := cli.Env{Layout: s.Layout}
-	if r := vpnlock(env, "", "notifications"); r.code != 0 || !strings.Contains(r.out, "Уведомления: включены.") {
+	if r := appguard(env, "", "notifications"); r.code != 0 || !strings.Contains(r.out, "Уведомления: включены.") {
 		t.Fatalf("%+v", r)
 	}
-	if r := vpnlock(env, "", "notifications", "off"); r.code != 0 || !strings.Contains(r.out, "Уведомления: выключены. Журнал пишется, как прежде") {
+	if r := appguard(env, "", "notifications", "off"); r.code != 0 || !strings.Contains(r.out, "Уведомления: выключены. Журнал пишется, как прежде") {
 		t.Fatalf("%+v", r)
 	}
-	if r := vpnlock(env, "", "status"); !strings.Contains(r.out, "Уведомления: выключены") {
+	if r := appguard(env, "", "status"); !strings.Contains(r.out, "Уведомления: выключены") {
 		t.Fatalf("статус: %s", r.out)
 	}
-	if r := vpnlock(env, "", "notifications", "on"); r.code != 0 || !strings.Contains(r.out, "Уведомления: включены.") {
+	if r := appguard(env, "", "notifications", "on"); r.code != 0 || !strings.Contains(r.out, "Уведомления: включены.") {
 		t.Fatalf("%+v", r)
 	}
-	if r := vpnlock(env, "", "notifications", "громко"); r.code != 2 {
+	if r := appguard(env, "", "notifications", "громко"); r.code != 2 {
 		t.Fatalf("%+v", r)
 	}
 }
@@ -248,7 +248,7 @@ func TestProtectSeveralDomainsAtOnce(t *testing.T) {
 	s.DNS.Maps("claude.ai", "160.79.104.10")
 	s.DNS.Maps("anthropic.com", "160.79.104.11")
 	env := cli.Env{Layout: s.Layout}
-	r := vpnlock(env, "", "protect", "claude.ai", "nosuch.example", "anthropic.com")
+	r := appguard(env, "", "protect", "claude.ai", "nosuch.example", "anthropic.com")
 	if r.code != 1 || !strings.Contains(r.out, "Сервис claude.ai защищён") || !strings.Contains(r.out, "Сервис anthropic.com защищён") ||
 		!strings.Contains(r.err, "Не удалось защитить nosuch.example") {
 		t.Fatalf("%+v", r)
@@ -256,17 +256,17 @@ func TestProtectSeveralDomainsAtOnce(t *testing.T) {
 	if got := s.SystemDNS.Domains(); !slices.Contains(got, "claude.ai") || !slices.Contains(got, "anthropic.com") {
 		t.Fatalf("резолверы: %v", got)
 	}
-	if r := vpnlock(env, "", "unprotect", "claude.ai", "anthropic.com"); r.code != 0 || strings.Count(r.out, "защита снята") != 2 {
+	if r := appguard(env, "", "unprotect", "claude.ai", "anthropic.com"); r.code != 0 || strings.Count(r.out, "защита снята") != 2 {
 		t.Fatalf("%+v", r)
 	}
-	if r := vpnlock(env, "", "protect"); r.code != 2 || !strings.Contains(r.err, "можно несколько через пробел") {
+	if r := appguard(env, "", "protect"); r.code != 2 || !strings.Contains(r.err, "можно несколько через пробел") {
 		t.Fatalf("%+v", r)
 	}
 }
 
 func TestProtectByNonAdminIsRefusedOnce(t *testing.T) {
 	s := servicetest.Start(t, "", servicetest.Fakes{Accounts: &servicetest.Accounts{Admin: false}})
-	r := vpnlock(cli.Env{Layout: s.Layout}, "", "protect", "claude.ai", "anthropic.com")
+	r := appguard(cli.Env{Layout: s.Layout}, "", "protect", "claude.ai", "anthropic.com")
 	if r.code != 1 || r.err == "" || strings.Count(strings.TrimSpace(r.err), "\n") != 0 || r.out != "" {
 		t.Fatalf("%+v", r)
 	}
@@ -277,7 +277,7 @@ func TestStatusShowsSystemProxy(t *testing.T) {
 	s.Web.Set("185.1.2.3", "DE", "DE")
 	s.Network.SetProxy(servicetest.Proxy(12334, "Hiddify"))
 	s.WaitStatus(t, 2*time.Second, func(st ipc.Status) bool { return len(st.Paths) == 1 && st.Paths[0].State == "verified" })
-	r := vpnlock(cli.Env{Layout: s.Layout}, "", "status")
+	r := appguard(cli.Env{Layout: s.Layout}, "", "status")
 	if !strings.Contains(r.out, "VPN: прокси 127.0.0.1:12334 (Hiddify) — выход 185.1.2.3, Германия — проверен\n") {
 		t.Fatalf("%s", r.out)
 	}
@@ -287,7 +287,7 @@ func TestStatusShowsSystemProxy(t *testing.T) {
 	s.WaitStatus(t, 2*time.Second, func(st ipc.Status) bool {
 		return len(st.Paths) == 1 && st.Paths[0].State == "russian" && strings.Contains(st.Paths[0].Summary, core.PortClosed)
 	})
-	r = vpnlock(cli.Env{Layout: s.Layout}, "", "status")
+	r = appguard(cli.Env{Layout: s.Layout}, "", "status")
 	if !strings.Contains(r.out, "VPN: прокси 127.0.0.1:12334 (Hiddify) — выход в России (95.1.2.3); порт закрыт для всех программ") {
 		t.Fatalf("%s", r.out)
 	}
@@ -358,7 +358,7 @@ func TestStatusFromOlderServiceSaysNothingAboutVPN(t *testing.T) {
 	go srv.Serve(ln)
 	defer ln.Close()
 
-	r := vpnlock(cli.Env{Layout: L}, "", "status")
+	r := appguard(cli.Env{Layout: L}, "", "status")
 	if r.code != 0 || strings.Contains(r.out, "VPN") || !strings.Contains(r.out, "У этой команды версия") {
 		t.Fatalf("%+v", r)
 	}
@@ -378,20 +378,20 @@ func withApps(t *testing.T) (*servicetest.Service, cli.Env) {
 
 func TestAddAppByNameAndStatusReminds(t *testing.T) {
 	s, env := withApps(t)
-	r := vpnlock(env, "", "add", "notion")
+	r := appguard(env, "", "add", "notion")
 	if r.code != 0 || !strings.Contains(r.out, "Notion добавлено и ждёт обучения") {
 		t.Fatalf("%+v", r)
 	}
-	r = vpnlock(env, "", "status")
+	r = appguard(env, "", "status")
 	for _, want := range []string{"Правило: любой выход не из России", "Приложения:", "Notion — ждёт обучения: ещё не защищено — включи VPN и открой его"} {
 		if !strings.Contains(r.out, want) {
 			t.Fatalf("в статусе нет %q:\n%s", want, r.out)
 		}
 	}
-	if r := vpnlock(env, "", "add", "Нет такого"); r.code != 1 || !strings.Contains(r.err, "нет в папках «Программы»") {
+	if r := appguard(env, "", "add", "Нет такого"); r.code != 1 || !strings.Contains(r.err, "нет в папках «Программы»") {
 		t.Fatalf("%+v", r)
 	}
-	if r := vpnlock(env, "", "add"); r.code != 2 || !strings.Contains(r.err, "Укажи приложение") {
+	if r := appguard(env, "", "add"); r.code != 2 || !strings.Contains(r.err, "Укажи приложение") {
 		t.Fatalf("без имени и без терминала: %+v", r)
 	}
 	_ = s
@@ -400,48 +400,48 @@ func TestAddAppByNameAndStatusReminds(t *testing.T) {
 func TestAddAppFromTheListHidesAlreadyAdded(t *testing.T) {
 	_, env := withApps(t)
 	env.Interactive = true
-	vpnlock(env, "", "add", "Notion")
+	appguard(env, "", "add", "Notion")
 	// В списке остаётся только Figma: Enter выбирает её.
-	r := vpnlock(env, "\r", "add")
+	r := appguard(env, "\r", "add")
 	if r.code != 0 || !strings.Contains(r.out, "Figma добавлено") || strings.Contains(r.out, "   Notion") {
 		t.Fatalf("%+v", r)
 	}
-	if r := vpnlock(env, "\r", "add"); !strings.Contains(r.out, "уже в списке") {
+	if r := appguard(env, "\r", "add"); !strings.Contains(r.out, "уже в списке") {
 		t.Fatalf("когда добавлено всё: %+v", r)
 	}
 }
 
 func TestRemoveAppWarnsAndAsks(t *testing.T) {
 	_, env := withApps(t)
-	vpnlock(env, "", "add", "Notion")
+	appguard(env, "", "add", "Notion")
 	env.Interactive = true
 
-	r := vpnlock(env, "\rнет\n", "remove")
+	r := appguard(env, "\rнет\n", "remove")
 	if r.code != 1 || !strings.Contains(r.out, "с домашнего адреса") || !strings.Contains(r.out, "защита осталась") {
 		t.Fatalf("отказ: %+v", r)
 	}
-	if r := vpnlock(env, "", "status"); !strings.Contains(r.out, "Notion — ждёт обучения") {
+	if r := appguard(env, "", "status"); !strings.Contains(r.out, "Notion — ждёт обучения") {
 		t.Fatalf("после отказа приложение пропало: %s", r.out)
 	}
-	r = vpnlock(env, "\rда\n", "remove")
+	r = appguard(env, "\rда\n", "remove")
 	if r.code != 0 || !strings.Contains(r.out, "С Notion защита снята") {
 		t.Fatalf("согласие: %+v", r)
 	}
-	if r := vpnlock(env, "", "status"); !strings.Contains(r.out, "Приложения: пока ни одного") {
+	if r := appguard(env, "", "status"); !strings.Contains(r.out, "Приложения: пока ни одного") {
 		t.Fatalf("после снятия: %s", r.out)
 	}
 }
 
 func TestRemoveAppWithoutTerminalNeedsYes(t *testing.T) {
 	_, env := withApps(t)
-	vpnlock(env, "", "add", "Notion")
-	if r := vpnlock(env, "", "remove", "Notion"); r.code != 1 || !strings.Contains(r.err, "--yes") {
+	appguard(env, "", "add", "Notion")
+	if r := appguard(env, "", "remove", "Notion"); r.code != 1 || !strings.Contains(r.err, "--yes") {
 		t.Fatalf("без подтверждения: %+v", r)
 	}
-	if r := vpnlock(env, "", "remove", "Notion", "--yes"); r.code != 0 {
+	if r := appguard(env, "", "remove", "Notion", "--yes"); r.code != 0 {
 		t.Fatalf("с --yes: %+v", r)
 	}
-	if r := vpnlock(env, "", "пауза"); r.code != 2 {
+	if r := appguard(env, "", "пауза"); r.code != 2 {
 		t.Fatalf("команда «пауза» существует: %+v", r)
 	}
 }
@@ -451,7 +451,7 @@ func TestMenuRunsActionsAndReturns(t *testing.T) {
 	env.Interactive = true
 	// Вниз до «Статус», Enter, Enter — назад, страница вниз — «Выход», Enter.
 	input := "\x1b[B\x1b[B\r\n\x1b[6~\r"
-	r := vpnlock(env, input)
+	r := appguard(env, input)
 	if r.code != 0 || !strings.Contains(r.out, "— Статус —") || !strings.Contains(r.out, "Служба: работает") {
 		t.Fatalf("%+v", r)
 	}
@@ -468,15 +468,15 @@ func TestMenuRunsActionsAndReturns(t *testing.T) {
 
 func TestRule(t *testing.T) {
 	_, env := withApps(t)
-	if r := vpnlock(env, "", "rule"); r.code != 0 || !strings.Contains(r.out, "любой выход не из России") {
+	if r := appguard(env, "", "rule"); r.code != 0 || !strings.Contains(r.out, "любой выход не из России") {
 		t.Fatalf("%+v", r)
 	}
 }
 
 func TestExportWritesTheCloneCatalogAndReports(t *testing.T) {
 	s, env := withApps(t)
-	vpnlock(env, "", "add", "Notion")
-	vpnlock(env, "", "add", "Figma") // ждёт обучения
+	appguard(env, "", "add", "Notion")
+	appguard(env, "", "add", "Figma") // ждёт обучения
 	s.Web.Set("203.0.113.89", "DE", "DE")
 	s.Network.Set(servicetest.Tunnel("utun11", "10.8.1.1"))
 	s.Apps.VPNServer("185.199.0.10")
@@ -495,7 +495,7 @@ func TestExportWritesTheCloneCatalogAndReports(t *testing.T) {
 	os.WriteFile(file, []byte(`{"format": 1, "updated": "2026-09-01", "apps": [
 		{"name": "Telegram", "macos": {"id": "ru.keepcoder.Telegram"}, "addrs": ["149.154.167.51"]}]}`), 0o644)
 
-	r := vpnlock(env, "", "catalog", "export", file)
+	r := appguard(env, "", "catalog", "export", file)
 	if r.code != 0 || !strings.Contains(r.out, "Notion: новое приложение; адреса 208.103.161.2") ||
 		!strings.Contains(r.out, "185.199.0.10 — сервер VPN") || !strings.Contains(r.out, "git diff") {
 		t.Fatalf("%+v", r)
@@ -508,18 +508,18 @@ func TestExportWritesTheCloneCatalogAndReports(t *testing.T) {
 	}
 
 	// Повтор без нового — файл не трогается.
-	r = vpnlock(env, "", "catalog", "export", file)
+	r = appguard(env, "", "catalog", "export", file)
 	if again, _ := os.ReadFile(file); r.code != 0 || string(again) != got || !strings.Contains(r.out, "файл не изменён") {
 		t.Fatalf("повтор: %+v", r)
 	}
 	// Статус показывает каталог, а без каталога — что его нет.
-	if r := vpnlock(env, "", "status"); !strings.Contains(r.out, "Каталог: не установлен") {
+	if r := appguard(env, "", "status"); !strings.Contains(r.out, "Каталог: не установлен") {
 		t.Fatalf("%s", r.out)
 	}
-	if r := vpnlock(env, "", "catalog", "load", file); r.code != 0 {
+	if r := appguard(env, "", "catalog", "load", file); r.code != 0 {
 		t.Fatalf("загрузка: %+v", r)
 	}
-	if r := vpnlock(env, "", "status"); !strings.Contains(r.out, "Каталог: от ") {
+	if r := appguard(env, "", "status"); !strings.Contains(r.out, "Каталог: от ") {
 		t.Fatalf("%s", r.out)
 	}
 }
@@ -536,20 +536,20 @@ func withVerifiedExit(t *testing.T, ip, country string) (*servicetest.Service, c
 
 func TestRememberAndOnlyMyExits(t *testing.T) {
 	_, env := withVerifiedExit(t, "185.1.2.3", "DE")
-	r := vpnlock(env, "", "remember", "Server", "1")
+	r := appguard(env, "", "remember", "Server", "1")
 	if r.code != 0 || !strings.Contains(r.out, "Сейчас выход 185.1.2.3, Германия.") ||
-		!strings.Contains(r.out, "Запомнено: Server 1 — Германия (185.1.2.3).") || !strings.Contains(r.out, "vpnlock rule mine") {
+		!strings.Contains(r.out, "Запомнено: Server 1 — Германия (185.1.2.3).") || !strings.Contains(r.out, "appguard rule mine") {
 		t.Fatalf("%+v", r)
 	}
-	r = vpnlock(env, "", "rule", "mine")
+	r = appguard(env, "", "rule", "mine")
 	if r.code != 0 || !strings.Contains(r.out, "Правило: только мои выходы") || !strings.Contains(r.out, "Мои выходы: Server 1 — Германия (185.1.2.3)") {
 		t.Fatalf("%+v", r)
 	}
-	r = vpnlock(env, "", "status")
+	r = appguard(env, "", "status")
 	if !strings.Contains(r.out, "Правило: только мои выходы") || !strings.Contains(r.out, "Мои выходы: Server 1") {
 		t.Fatalf("статус: %s", r.out)
 	}
-	if r := vpnlock(env, "", "rule", "пауза"); r.code != 2 {
+	if r := appguard(env, "", "rule", "пауза"); r.code != 2 {
 		t.Fatalf("несуществующее правило: %+v", r)
 	}
 }
@@ -558,27 +558,27 @@ func TestRuleAndRememberInTheTerminal(t *testing.T) {
 	_, env := withVerifiedExit(t, "185.1.2.3", "DE")
 	env.Interactive = true
 	// Вниз — «только мои выходы»; список пуст — предупреждение.
-	r := vpnlock(env, "\x1b[B\r", "rule")
+	r := appguard(env, "\x1b[B\r", "rule")
 	if r.code != 0 || !strings.Contains(r.out, "Правило: только мои выходы") || !strings.Contains(r.out, "нет ни одного выхода") {
 		t.Fatalf("%+v", r)
 	}
-	r = vpnlock(env, "Дом\n", "remember")
+	r = appguard(env, "Дом\n", "remember")
 	if r.code != 0 || !strings.Contains(r.out, "Как назвать этот выход") || !strings.Contains(r.out, "Запомнено: Дом — Германия") {
 		t.Fatalf("%+v", r)
 	}
-	if strings.Contains(r.out, "vpnlock rule mine") {
+	if strings.Contains(r.out, "appguard rule mine") {
 		t.Fatal("правило уже «мои», а подсказка предлагает его выбрать")
 	}
 }
 
 func TestRussianExitIsNotRememberedByCommand(t *testing.T) {
 	_, env := withVerifiedExit(t, "95.1.2.3", "RU")
-	r := vpnlock(env, "", "remember", "Офис")
+	r := appguard(env, "", "remember", "Офис")
 	if r.code != 1 || !strings.Contains(r.out, "Сейчас выход 95.1.2.3, Россия.") || !strings.Contains(r.err, "российский выход не сохраняется") {
 		t.Fatalf("%+v", r)
 	}
 	s := servicetest.Start(t, "", servicetest.Fakes{Accounts: &servicetest.Accounts{Admin: true}})
-	if r := vpnlock(cli.Env{Layout: s.Layout}, "", "remember", "x"); r.code != 1 || !strings.Contains(r.err, "нет проверенного выхода") {
+	if r := appguard(cli.Env{Layout: s.Layout}, "", "remember", "x"); r.code != 1 || !strings.Contains(r.err, "нет проверенного выхода") {
 		t.Fatalf("без VPN: %+v", r)
 	}
 }
@@ -601,20 +601,20 @@ func TestAddCommandByName(t *testing.T) {
 	}
 	t.Setenv("PATH", bin)
 
-	r := vpnlock(env, "", "add", "claude")
+	r := appguard(env, "", "add", "claude")
 	if r.code != 0 || !strings.Contains(r.out, "claude добавлено и ждёт обучения") || !strings.Contains(r.out, "не открывай через неё посторонние сайты") {
 		t.Fatalf("%+v", r)
 	}
-	if r := vpnlock(env, "", "add", "Claude"); r.code != 0 || !strings.Contains(r.out, "Claude добавлено") {
+	if r := appguard(env, "", "add", "Claude"); r.code != 0 || !strings.Contains(r.out, "Claude добавлено") {
 		t.Fatalf("приложение Claude: %+v", r)
 	}
-	if r := vpnlock(env, "", "add", "tool"); r.code != 1 || !strings.Contains(r.err, "укажи путь") || !strings.Contains(r.err, filepath.Join(bin, "tool")) {
+	if r := appguard(env, "", "add", "tool"); r.code != 1 || !strings.Contains(r.err, "укажи путь") || !strings.Contains(r.err, filepath.Join(bin, "tool")) {
 		t.Fatalf("неоднозначное имя: %+v", r)
 	}
-	if r := vpnlock(env, "", "add", "nosuch"); r.code != 1 || !strings.Contains(r.err, "и консольной программы с таким именем тоже") {
+	if r := appguard(env, "", "add", "nosuch"); r.code != 1 || !strings.Contains(r.err, "и консольной программы с таким именем тоже") {
 		t.Fatalf("%+v", r)
 	}
-	if r := vpnlock(env, "", "status"); !strings.Contains(r.out, "claude — ждёт обучения: ещё не защищено — включи VPN и запусти программу") {
+	if r := appguard(env, "", "status"); !strings.Contains(r.out, "claude — ждёт обучения: ещё не защищено — включи VPN и запусти программу") {
 		t.Fatalf("статус: %s", r.out)
 	}
 }
@@ -628,25 +628,25 @@ func TestImportFile(t *testing.T) {
 	dir := t.TempDir()
 	list := filepath.Join(dir, "list.txt")
 	os.WriteFile(list, []byte("# мои сервисы\nclaude.ai\nhttps://anthropic.com/news\n160.79.104.10\n192.168.0.1\n"), 0o644)
-	r := vpnlock(env, "", "import", list)
+	r := appguard(env, "", "import", list)
 	if r.code != 0 || !strings.Contains(r.out, "Защищено сразу: 2 домена и 1 адрес") || !strings.Contains(r.out, "отброшено: 192.168.0.1") {
 		t.Fatalf("%+v", r)
 	}
 	export := filepath.Join(dir, "export.json")
 	os.WriteFile(export, []byte(`{"format": 1, "apps": [{"name": "Notion", "macos": {"id": "notion.id"}, "domains": ["claude.ai"], "addrs": ["208.103.161.2", "160.79.104.10"]}]}`), 0o644)
-	if r := vpnlock(env, "", "import", export); r.code != 0 || !strings.Contains(r.out, "Защищено сразу: 0 доменов и 1 адрес") || !strings.Contains(r.out, "Ещё 2 из файла уже были под защитой") {
+	if r := appguard(env, "", "import", export); r.code != 0 || !strings.Contains(r.out, "Защищено сразу: 0 доменов и 1 адрес") || !strings.Contains(r.out, "Ещё 2 из файла уже были под защитой") {
 		t.Fatalf("выгрузка: %+v", r)
 	}
-	if r := vpnlock(env, "", "protect", "34.149.66.165"); r.code != 0 || !strings.Contains(r.out, "Адрес 34.149.66.165 защищён") {
+	if r := appguard(env, "", "protect", "34.149.66.165"); r.code != 0 || !strings.Contains(r.out, "Адрес 34.149.66.165 защищён") {
 		t.Fatalf("protect адреса: %+v", r)
 	}
-	if r := vpnlock(env, "", "status"); !strings.Contains(r.out, "Вручную: anthropic.com, claude.ai; 3 адреса") {
+	if r := appguard(env, "", "status"); !strings.Contains(r.out, "Вручную: anthropic.com, claude.ai; 3 адреса") {
 		t.Fatalf("статус: %s", r.out)
 	}
-	if r := vpnlock(env, "", "import", filepath.Join(dir, "нет")); r.code != 1 || !strings.Contains(r.err, "не читается") {
+	if r := appguard(env, "", "import", filepath.Join(dir, "нет")); r.code != 1 || !strings.Contains(r.err, "не читается") {
 		t.Fatalf("%+v", r)
 	}
-	if r := vpnlock(env, "", "import"); r.code != 2 {
+	if r := appguard(env, "", "import"); r.code != 2 {
 		t.Fatalf("%+v", r)
 	}
 }
@@ -655,32 +655,32 @@ func TestImportFile(t *testing.T) {
 func TestRememberAndForgetExitByAddress(t *testing.T) {
 	s := servicetest.Start(t, "", servicetest.Fakes{Accounts: &servicetest.Accounts{Admin: true}})
 	env := cli.Env{Layout: s.Layout}
-	r := vpnlock(env, "", "remember", "Сингапур", "203.0.113.7")
+	r := appguard(env, "", "remember", "Сингапур", "203.0.113.7")
 	if r.code != 0 || !strings.Contains(r.out, "Запомнено: Сингапур — введён вручную, ещё не проверен (203.0.113.7)") ||
-		!strings.Contains(r.out, "Нужен адрес выхода") || !strings.Contains(r.out, "vpnlock rule mine") {
+		!strings.Contains(r.out, "Нужен адрес выхода") || !strings.Contains(r.out, "appguard rule mine") {
 		t.Fatalf("%+v", r)
 	}
-	if r := vpnlock(env, "", "status"); !strings.Contains(r.out, "Мои выходы: Сингапур — введён вручную, ещё не проверен (203.0.113.7)") {
+	if r := appguard(env, "", "status"); !strings.Contains(r.out, "Мои выходы: Сингапур — введён вручную, ещё не проверен (203.0.113.7)") {
 		t.Fatalf("статус: %s", r.out)
 	}
-	if r := vpnlock(env, "", "remember", "Сингапур"); r.code != 1 || !strings.Contains(r.err, "vpnlock remember Сингапур 203.0.113.5") {
+	if r := appguard(env, "", "remember", "Сингапур"); r.code != 1 || !strings.Contains(r.err, "appguard remember Сингапур 203.0.113.5") {
 		t.Fatalf("без VPN и без адреса: %+v", r)
 	}
-	if r := vpnlock(env, "", "forget", "сингапур"); r.code != 0 || !strings.Contains(r.out, "Забыт выход: Сингапур") {
+	if r := appguard(env, "", "forget", "сингапур"); r.code != 0 || !strings.Contains(r.out, "Забыт выход: Сингапур") {
 		t.Fatalf("забыть: %+v", r)
 	}
-	if r := vpnlock(env, "", "forget", "Сингапур"); r.code != 1 || !strings.Contains(r.err, "Выхода «Сингапур» в списке нет") {
+	if r := appguard(env, "", "forget", "Сингапур"); r.code != 1 || !strings.Contains(r.err, "Выхода «Сингапур» в списке нет") {
 		t.Fatalf("забыть ещё раз: %+v", r)
 	}
-	if r := vpnlock(env, "", "forget"); r.code != 2 || !strings.Contains(r.err, "vpnlock forget claude 34.149.66.165") {
+	if r := appguard(env, "", "forget"); r.code != 2 || !strings.Contains(r.err, "appguard forget claude 34.149.66.165") {
 		t.Fatalf("без аргументов: %+v", r)
 	}
 }
 
-// Что выучило приложение — vpnlock status <приложение>; лишнее — vpnlock forget.
+// Что выучило приложение — appguard status <приложение>; лишнее — appguard forget.
 func TestForgetLearnedAddressFromApp(t *testing.T) {
 	s, env := withApps(t)
-	vpnlock(env, "", "add", "Notion")
+	appguard(env, "", "add", "Notion")
 	s.Web.Set("185.1.2.3", "DE", "DE")
 	s.Network.Set(servicetest.Tunnel("utun11", "10.8.1.1"))
 	s.Apps.Run("notion.id", "208.103.161.2:443", "203.0.113.50:443")
@@ -688,23 +688,23 @@ func TestForgetLearnedAddressFromApp(t *testing.T) {
 		return len(st.Apps) == 1 && st.Apps[0].Learned && st.Apps[0].Addrs == 2
 	})
 
-	r := vpnlock(env, "", "status", "notion")
+	r := appguard(env, "", "status", "notion")
 	if r.code != 0 || !strings.Contains(r.out, "Notion — защищено: 2 адреса") || !strings.Contains(r.out, "Адреса — 2:\n  203.0.113.50\n  208.103.161.2\n") ||
-		!strings.Contains(r.out, "Домены (вместе с поддоменами): нет") || !strings.Contains(r.out, "vpnlock forget Notion <адрес или домен>") {
+		!strings.Contains(r.out, "Домены (вместе с поддоменами): нет") || !strings.Contains(r.out, "appguard forget Notion <адрес или домен>") {
 		t.Fatalf("статус приложения: %+v", r)
 	}
-	r = vpnlock(env, "", "forget", "Notion", "203.0.113.50", "198.51.100.1")
+	r = appguard(env, "", "forget", "Notion", "203.0.113.50", "198.51.100.1")
 	if r.code != 0 || !strings.Contains(r.out, "У Notion забыто: 203.0.113.50. Без VPN это больше не закрыто") ||
 		!strings.Contains(r.out, "198.51.100.1 у Notion не выучен") {
 		t.Fatalf("забыть: %+v", r)
 	}
-	if r := vpnlock(env, "", "status", "Notion"); !strings.Contains(r.out, "Адреса — 1:\n  208.103.161.2\n") || !strings.Contains(r.out, "Забыто: 203.0.113.50") {
+	if r := appguard(env, "", "status", "Notion"); !strings.Contains(r.out, "Адреса — 1:\n  208.103.161.2\n") || !strings.Contains(r.out, "Забыто: 203.0.113.50") {
 		t.Fatalf("после забывания: %s", r.out)
 	}
-	if r := vpnlock(env, "", "forget", "Figma", "1.2.3.4"); r.code != 1 || !strings.Contains(r.err, "нет ни выхода с таким именем, ни приложения") {
+	if r := appguard(env, "", "forget", "Figma", "1.2.3.4"); r.code != 1 || !strings.Contains(r.err, "нет ни выхода с таким именем, ни приложения") {
 		t.Fatalf("не защищённое приложение: %+v", r)
 	}
-	if r := vpnlock(env, "", "status", "Figma"); r.code != 1 || !strings.Contains(r.err, "«Figma» нет в списке") {
+	if r := appguard(env, "", "status", "Figma"); r.code != 1 || !strings.Contains(r.err, "«Figma» нет в списке") {
 		t.Fatalf("статус не защищённого: %+v", r)
 	}
 }

@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"vpnlock/internal/apps"
-	"vpnlock/internal/cli"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/apps"
+	"appguard/internal/cli"
+	"appguard/internal/service/servicetest"
 )
 
 // withConfig — служба с администратором, приложение Notion и команда claude в
@@ -47,26 +47,26 @@ notifications off
 `)
 	os.WriteFile(filepath.Join(filepath.Dir(file), "list.txt"), []byte("anthropic.com\n"), 0o644)
 
-	r := vpnlock(env, "", "apply", file)
+	r := appguard(env, "", "apply", file)
 	for _, want := range []string{
 		"Применяю конфиг " + file,
-		"  · vpnlock add claude",
+		"  · appguard add claude",
 		"      claude добавлено и ждёт обучения",
 		"      Notion добавлено и ждёт обучения",
 		"  ! Figma — нет на этом компьютере, пропускаю",
 		"  ! ~/Applications/Нет.app — нет на этом компьютере, пропускаю",
-		"  · vpnlock protect claude.ai 160.79.104.10",
+		"  · appguard protect claude.ai 160.79.104.10",
 		"      Сервис claude.ai защищён",
 		"      Адрес 160.79.104.10 защищён",
-		"  · vpnlock import " + filepath.Join(filepath.Dir(file), "list.txt"),
+		"  · appguard import " + filepath.Join(filepath.Dir(file), "list.txt"),
 		"      Защищено сразу: 1 домен",
-		"  · vpnlock remember Германия 203.0.113.7",
+		"  · appguard remember Германия 203.0.113.7",
 		"      Запомнено: Германия — введён вручную",
 		"      Уведомления: выключены.",
 		"  Служба: работает с ",
 		"  Вручную: anthropic.com, claude.ai; 1 адрес",
 		"✓ Готово. Пропущено: 2 программы",
-		"Чтобы сервисы открывались только через твои выходы: vpnlock rule mine",
+		"Чтобы сервисы открывались только через твои выходы: appguard rule mine",
 	} {
 		if !strings.Contains(r.out, want) {
 			t.Errorf("нет %q", want)
@@ -76,7 +76,7 @@ notifications off
 		t.Fatalf("%+v", r)
 	}
 
-	r = vpnlock(env, "", "apply", file)
+	r = appguard(env, "", "apply", file)
 	if r.code != 0 || strings.Count(r.out, "уже в списке — ждёт обучения") != 2 || !strings.Contains(r.out, "✓ Готово.") {
 		t.Fatalf("повторно: %+v", r)
 	}
@@ -86,20 +86,20 @@ notifications off
 // «только мои» не включается, если выход до него не запомнился.
 func TestApplyStopsBeforeHalfApplying(t *testing.T) {
 	_, env, file := withConfig(t, "app Notion\nrule maybe\n")
-	r := vpnlock(env, "", "apply", file)
+	r := appguard(env, "", "apply", file)
 	if r.code != 1 || !strings.Contains(r.err, "строка 2: нужно rule mine или rule any. Ничего не изменено.") || strings.Contains(r.out, "Notion") {
 		t.Fatalf("%+v", r)
 	}
-	if r := vpnlock(env, "", "status"); !strings.Contains(r.out, "Приложения: пока ни одного") {
+	if r := appguard(env, "", "status"); !strings.Contains(r.out, "Приложения: пока ни одного") {
 		t.Fatalf("после отказа: %s", r.out)
 	}
 
 	os.WriteFile(file, []byte("exit Офис 192.168.0.1\nrule mine\n"), 0o644)
-	r = vpnlock(env, "", "apply", file)
-	if r.code != 1 || !strings.Contains(r.out, "не адрес выхода") || !strings.Contains(r.err, "Строка 1 не применена") || strings.Contains(r.out, "vpnlock rule") {
+	r = appguard(env, "", "apply", file)
+	if r.code != 1 || !strings.Contains(r.out, "не адрес выхода") || !strings.Contains(r.err, "Строка 1 не применена") || strings.Contains(r.out, "appguard rule") {
 		t.Fatalf("%+v", r)
 	}
-	if r := vpnlock(env, "", "status"); !strings.Contains(r.out, "Правило: любой выход не из России") {
+	if r := appguard(env, "", "status"); !strings.Contains(r.out, "Правило: любой выход не из России") {
 		t.Fatalf("правило сменилось: %s", r.out)
 	}
 }
@@ -109,26 +109,26 @@ func TestApplyStopsBeforeHalfApplying(t *testing.T) {
 func TestApplyTakesThisSystemConfigFromTheClone(t *testing.T) {
 	_, env, _ := withConfig(t, "")
 	clone := t.TempDir()
-	os.WriteFile(filepath.Join(clone, "go.mod"), []byte("module vpnlock\n"), 0o644)
+	os.WriteFile(filepath.Join(clone, "go.mod"), []byte("module appguard\n"), 0o644)
 	os.MkdirAll(filepath.Join(clone, "setup"), 0o755)
 	t.Chdir(clone)
 
-	r := vpnlock(env, "", "apply")
+	r := appguard(env, "", "apply")
 	if r.code != 1 || !strings.Contains(r.err, "В клоне нет конфига для этой системы: "+filepath.Join(clone, "configs", "macos.conf")) {
 		t.Fatalf("без конфига: %+v", r)
 	}
 	os.MkdirAll(filepath.Join(clone, "configs"), 0o755)
 	os.WriteFile(filepath.Join(clone, "configs", "linux.conf"), []byte("app nosuch\n"), 0o644)
 	os.WriteFile(filepath.Join(clone, "configs", "macos.conf"), []byte("app claude\nnotifications on\n"), 0o644)
-	r = vpnlock(env, "", "apply")
+	r = appguard(env, "", "apply")
 	if r.code != 0 || !strings.Contains(r.out, "Применяю конфиг "+filepath.Join(clone, "configs", "macos.conf")) ||
 		!strings.Contains(r.out, "claude добавлено") || !strings.Contains(r.out, "✓ Готово: конфиг применён.") ||
-		!strings.Contains(r.out, "vpnlock remember <имя>") || !strings.Contains(r.out, "vpnlock rule mine") {
+		!strings.Contains(r.out, "appguard remember <имя>") || !strings.Contains(r.out, "appguard rule mine") {
 		t.Fatalf("%+v", r)
 	}
 
 	t.Chdir(t.TempDir())
-	if r := vpnlock(env, "", "apply"); r.code != 1 || !strings.Contains(r.err, "Не нашёл клон vpnlock") {
+	if r := appguard(env, "", "apply"); r.code != 1 || !strings.Contains(r.err, "Не нашёл клон appguard") {
 		t.Fatalf("не из клона: %+v", r)
 	}
 }
@@ -138,17 +138,17 @@ func TestApplyTakesThisSystemConfigFromTheClone(t *testing.T) {
 func TestApplyRefusals(t *testing.T) {
 	_, env, file := withConfig(t, "notifications off\n")
 	env.Root = true
-	if r := vpnlock(env, "", "apply", file); r.code != 1 || !strings.Contains(r.err, "Запусти без sudo") {
+	if r := appguard(env, "", "apply", file); r.code != 1 || !strings.Contains(r.err, "Запусти без sudo") {
 		t.Fatalf("под sudo: %+v", r)
 	}
 
 	s := servicetest.Start(t, "", servicetest.Fakes{Accounts: &servicetest.Accounts{Admin: false}})
 	os.WriteFile(file, []byte("protect claude.ai\nnotifications off\n"), 0o644)
-	r := vpnlock(cli.Env{Layout: s.Layout}, "", "apply", file)
+	r := appguard(cli.Env{Layout: s.Layout}, "", "apply", file)
 	if r.code != 1 || strings.Count(r.out, "только администратор") != 1 || !strings.Contains(r.err, "Строка 1 не применена") {
 		t.Fatalf("не администратор: %+v", r)
 	}
-	if r := vpnlock(cli.Env{Layout: s.Layout}, "", "apply", filepath.Join(filepath.Dir(file), "нет.conf")); r.code != 1 || !strings.Contains(r.err, "Конфиг не читается") {
+	if r := appguard(cli.Env{Layout: s.Layout}, "", "apply", filepath.Join(filepath.Dir(file), "нет.conf")); r.code != 1 || !strings.Contains(r.err, "Конфиг не читается") {
 		t.Fatalf("нет файла: %+v", r)
 	}
 }

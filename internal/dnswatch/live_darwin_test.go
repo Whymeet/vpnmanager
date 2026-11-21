@@ -14,7 +14,7 @@ import (
 
 // Живая проверка: ответ DNS на интерфейсе маршрута по умолчанию слышен через
 // BPF. Нужен root — собрать `tools/go test -c -tags live -o
-// /tmp/vpnlock-dnswatch.test ./internal/dnswatch`, запустить под sudo.
+// /tmp/appguard-dnswatch.test ./internal/dnswatch`, запустить под sudo.
 func TestLiveHearsDNSAnswers(t *testing.T) {
 	if os.Geteuid() != 0 {
 		t.Skip("BPF открывает только root")

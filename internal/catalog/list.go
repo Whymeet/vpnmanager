@@ -8,10 +8,10 @@ import (
 	"strings"
 	"unicode"
 
-	"vpnlock/internal/resolver"
+	"appguard/internal/resolver"
 )
 
-// ParseList — домены и адреса из файла для vpnlock import. Файл — выгрузка
+// ParseList — домены и адреса из файла для appguard import. Файл — выгрузка
 // (каталог JSON: домены и адреса всех его приложений) или простой список: по
 // домену, адресу или ссылке, через пробел, запятую или с новой строки; «#» —
 // комментарий до конца строки. Из ссылки берётся имя (https://claude.ai/new →

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"vpnlock/internal/paths"
+	"appguard/internal/paths"
 )
 
 // fakeLaunchd записывает вызовы вместо настоящего launchd. bootoutErr — что
@@ -53,7 +53,7 @@ func (f *fakeLaunchd) BootoutUser(uid int, label string) error {
 func setup(t *testing.T) (*Installer, *fakeLaunchd, string) {
 	t.Helper()
 	root := t.TempDir()
-	src := filepath.Join(root, "clone", "bin", "vpnlock")
+	src := filepath.Join(root, "clone", "bin", "appguard")
 	os.MkdirAll(filepath.Dir(src), 0o755)
 	os.WriteFile(src, []byte("сборка 1"), 0o755)
 	l := &fakeLaunchd{}
@@ -91,7 +91,7 @@ func TestInstallPutsServiceInPlace(t *testing.T) {
 		t.Fatalf("каталог настроек %v, ждали 0700", m)
 	}
 	if target, err := os.Readlink(L.CommandLink); err != nil || target != L.Binary {
-		t.Fatalf("команда vpnlock ведёт на %q (%v)", target, err)
+		t.Fatalf("команда appguard ведёт на %q (%v)", target, err)
 	}
 
 	plist, _ := os.ReadFile(L.Plist)
@@ -184,15 +184,15 @@ func TestUninstallRemovesEverythingAndReinstallIsClean(t *testing.T) {
 func TestDisabledReadsLaunchctlOutput(t *testing.T) {
 	out := `disabled services = {
 		"com.apple.ftpd" => disabled
-		"com.vpnlock.daemon" => enabled
+		"com.appguard.daemon" => enabled
 		"com.example.old" => true
 	}
 `
 	for label, want := range map[string]bool{
-		"com.apple.ftpd":     true,
-		"com.vpnlock.daemon": false,
-		"com.example.old":    true,
-		"com.absent":         false,
+		"com.apple.ftpd":      true,
+		"com.appguard.daemon": false,
+		"com.example.old":     true,
+		"com.absent":          false,
 	} {
 		if got := disabled(out, label); got != want {
 			t.Errorf("%s: запрещена %v, ждали %v", label, got, want)
@@ -207,19 +207,19 @@ func TestRemoveKeepsForeignCommand(t *testing.T) {
 		t.Fatal(err)
 	}
 	os.Remove(L.CommandLink)
-	os.Symlink("/opt/elsewhere/vpnlock", L.CommandLink)
+	os.Symlink("/opt/elsewhere/appguard", L.CommandLink)
 
 	if err := in.Remove(); err != nil {
 		t.Fatal(err)
 	}
-	if target, _ := os.Readlink(L.CommandLink); target != "/opt/elsewhere/vpnlock" {
+	if target, _ := os.Readlink(L.CommandLink); target != "/opt/elsewhere/appguard" {
 		t.Fatal("удаление сняло чужую команду")
 	}
 }
 
 func TestInstallBringsTheCloneCatalog(t *testing.T) {
 	in, _, src := setup(t)
-	repo := filepath.Dir(filepath.Dir(src)) // src — <клон>/bin/vpnlock
+	repo := filepath.Dir(filepath.Dir(src)) // src — <клон>/bin/appguard
 	os.MkdirAll(filepath.Join(repo, "catalog"), 0o755)
 	cat := filepath.Join(repo, "catalog", "catalog.json")
 	os.WriteFile(cat, []byte(`{"format": 1, "updated": "2026-10-15", "apps": [{"name": "Notion", "macos": {"id": "notion.id"}}]}`), 0o644)
@@ -282,9 +282,9 @@ func TestInstallPutsCatalogAgentForTheSudoUser(t *testing.T) {
 	}
 }
 
-// sudo vpnlock uninstall: правила снимаются после остановки службы (иначе сторож
+// sudo appguard uninstall: правила снимаются после остановки службы (иначе сторож
 // вернул бы их) и до удаления файлов — токен pf лежит в каталоге службы, и
-// без него pf осталась бы ссылка vpnlock.
+// без него pf осталась бы ссылка appguard.
 func TestUninstallClearsRulesBetweenStopAndFiles(t *testing.T) {
 	in, l, src := setup(t)
 	L := in.Layout
@@ -357,13 +357,13 @@ func TestInstallPutsTrayForTheSudoUser(t *testing.T) {
 	text := string(data)
 	for _, want := range []string{
 		paths.TrayLabel, in.Layout.Binary, "<string>tray</string>", "RunAtLoad", "KeepAlive",
-		"<key>LimitLoadToSessionType</key>\n\t<string>Aqua</string>", filepath.Join(home, "Library", "Logs", "vpnlock-tray.log"),
+		"<key>LimitLoadToSessionType</key>\n\t<string>Aqua</string>", filepath.Join(home, "Library", "Logs", "appguard-tray.log"),
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("в значке нет %q:\n%s", want, text)
 		}
 	}
-	// С AbandonProcessGroup osascript пережил бы vpnlock tray и значок врал бы.
+	// С AbandonProcessGroup osascript пережил бы appguard tray и значок врал бы.
 	for _, wrong := range []string{"AbandonProcessGroup", "Background"} {
 		if strings.Contains(text, wrong) {
 			t.Fatalf("в значке %q:\n%s", wrong, text)
@@ -375,7 +375,7 @@ func TestInstallPutsTrayForTheSudoUser(t *testing.T) {
 	if !slices.Contains(l.calls, "bootstrap gui/501 "+plist) {
 		t.Fatalf("значок не загружен в сеанс пользователя: %v", l.calls)
 	}
-	if !strings.Contains(in.Note, "Значок vpnlock — в строке меню") {
+	if !strings.Contains(in.Note, "Значок appguard — в строке меню") {
 		t.Fatalf("заметка: %q", in.Note)
 	}
 }
@@ -506,4 +506,24 @@ func TestTrayFailureDoesNotStopInstall(t *testing.T) {
 			t.Fatalf("заметка: %q", in.Note)
 		}
 	})
+}
+
+func TestInstallOverOldVpnlockMovesSettings(t *testing.T) {
+	in, l, src := setup(t)
+	root := filepath.Dir(filepath.Dir(filepath.Dir(src))) // src — <корень>/clone/bin/appguard
+	lg := oldInstall(t, root)
+	lg.Uninstall = func(string) error { return os.RemoveAll(filepath.Dir(filepath.Dir(lg.Binary))) }
+	in.Legacy = lg
+	if err := in.Install(src); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(in.Layout.ConfigFile); string(got) != `{"rule":"mine"}` {
+		t.Fatalf("настройки vpnlock не переехали: %q", got)
+	}
+	if !strings.Contains(in.Note, legacyNote) {
+		t.Fatalf("человеку не сказано про перенос: %q", in.Note)
+	}
+	if !slices.Contains(l.calls, "bootstrap "+in.Layout.Plist) {
+		t.Fatal("служба appguard не запущена")
+	}
 }

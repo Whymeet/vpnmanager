@@ -11,8 +11,8 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// Канал службы на Windows — два именованных канала: общий (\\.\pipe\vpnlock) и
-// канал администратора (\\.\pipe\vpnlock-admin). Кто вправе менять настройки,
+// Канал службы на Windows — два именованных канала: общий (\\.\pipe\appguard) и
+// канал администратора (\\.\pipe\appguard-admin). Кто вправе менять настройки,
 // решает сама Windows по правам канала: в канал администратора ядро пускает
 // только программы, запущенные от имени администратора. У администратора в
 // обычном окне PowerShell группа администраторов в маркере доступа только
@@ -53,7 +53,7 @@ func Listen(path string) (net.Listener, error) {
 // dial подключается к каналу администратора, а если Windows туда не пускает, —
 // к общему. Клиент не разрешает службе действовать от своего имени
 // (SECURITY_ANONYMOUS): программа, занявшая имя канала, не получит прав того,
-// кто запустил vpnlock от имени администратора.
+// кто запустил appguard от имени администратора.
 func dial(path string) (net.Conn, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), dialTimeout)
 	defer cancel()
@@ -91,7 +91,7 @@ func ownedByService(conn net.Conn) error {
 	if owner.IsWellKnown(windows.WinLocalSystemSid) || owner.IsWellKnown(windows.WinBuiltinAdministratorsSid) {
 		return nil
 	}
-	return fmt.Errorf("канал открыла не служба vpnlock, а программа пользователя %s", owner)
+	return fmt.Errorf("канал открыла не служба appguard, а программа пользователя %s", owner)
 }
 
 // peerOf — пришёл ли клиент по каналу администратора, и его процесс.

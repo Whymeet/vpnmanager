@@ -31,7 +31,7 @@ CLAUDE.AI
 	}
 }
 
-// Выгрузка vpnlock catalog export — домены и адреса всех приложений.
+// Выгрузка appguard catalog export — домены и адреса всех приложений.
 func TestParseListExport(t *testing.T) {
 	export := `{"format": 1, "apps": [
 		{"name": "Claude", "macos": {"id": "com.anthropic.claudefordesktop"}, "domains": ["claude.ai"], "addrs": ["160.79.104.10"]},

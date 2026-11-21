@@ -15,20 +15,20 @@ import (
 	"golang.org/x/sys/windows"
 	"golang.org/x/sys/windows/svc"
 
-	"vpnlock/internal/accounts"
-	"vpnlock/internal/apps"
-	"vpnlock/internal/cli"
-	"vpnlock/internal/dnswatch"
-	"vpnlock/internal/enforce"
-	"vpnlock/internal/exitcheck"
-	"vpnlock/internal/install"
-	"vpnlock/internal/netwatch"
-	"vpnlock/internal/notify"
-	"vpnlock/internal/paths"
-	"vpnlock/internal/procs"
-	"vpnlock/internal/service"
-	"vpnlock/internal/sysdns"
-	"vpnlock/internal/version"
+	"appguard/internal/accounts"
+	"appguard/internal/apps"
+	"appguard/internal/cli"
+	"appguard/internal/dnswatch"
+	"appguard/internal/enforce"
+	"appguard/internal/exitcheck"
+	"appguard/internal/install"
+	"appguard/internal/netwatch"
+	"appguard/internal/notify"
+	"appguard/internal/paths"
+	"appguard/internal/procs"
+	"appguard/internal/service"
+	"appguard/internal/sysdns"
+	"appguard/internal/version"
 )
 
 // dnsAddr — где слушает резолвер службы. Порт — 53: другого правила NRPT не
@@ -41,7 +41,7 @@ var dnsAddr = netip.MustParseAddrPort("127.53.53.53:53")
 func platform(env *cli.Env) {
 	// Удаление снимает фильтры WFP и правила NRPT само, от имени
 	// администратора: служба к этому времени остановлена.
-	inst := &install.Installer{Layout: env.Layout, Clear: func() error {
+	inst := &install.Installer{Layout: env.Layout, Legacy: legacy(env.Layout), Clear: func() error {
 		return errors.Join(wfp(env.Layout, nil).Clear(), sysdns.System(dnsAddr).Clear())
 	}}
 	env.Root = elevated()
@@ -59,7 +59,7 @@ func platform(env *cli.Env) {
 	env.Update = update
 }
 
-// update собирает vpnlock в клоне подготовкой — от имени того же человека, в
+// update собирает appguard в клоне подготовкой — от имени того же человека, в
 // том же окне — и ставит собранное, как на шаге установки, с теми же
 // настройками.
 func update(clone string) error {
@@ -75,7 +75,7 @@ func update(clone string) error {
 	if err := prep.Run(); err != nil {
 		return fmt.Errorf("подготовка не прошла: %w", err)
 	}
-	inst := exec.Command(filepath.Join(clone, "bin", "vpnlock.exe"), "install")
+	inst := exec.Command(filepath.Join(clone, "bin", "appguard.exe"), "install")
 	inst.Stdin, inst.Stdout, inst.Stderr = os.Stdin, os.Stdout, os.Stderr
 	if err := inst.Run(); err != nil {
 		return fmt.Errorf("новая версия не встала: %w", err)
@@ -178,7 +178,7 @@ func (h *handler) Execute(_ []string, req <-chan svc.ChangeRequest, status chan<
 				// диспетчер служб запустит службу снова (К22). Защита всё это
 				// время держится на постоянных фильтрах.
 				if c.Cmd == svc.Stop && time.Since(planned) > plannedFor {
-					h.logf("службу остановили не через vpnlock — диспетчер служб запустит её снова")
+					h.logf("службу остановили не через appguard — диспетчер служб запустит её снова")
 					return false, 1
 				}
 				return false, 0

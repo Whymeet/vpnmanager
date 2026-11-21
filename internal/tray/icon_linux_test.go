@@ -236,7 +236,7 @@ func TestPropertiesAsHostsReadThem(t *testing.T) {
 			t.Errorf("%s: подпись %q, ждали %q", prop, got, sig)
 		}
 	}
-	if props["Id"].Value() != "vpnlock" || props["Status"].Value() != "Active" || props["Category"].Value() != "SystemServices" {
+	if props["Id"].Value() != "appguard" || props["Status"].Value() != "Active" || props["Category"].Value() != "SystemServices" {
 		t.Errorf("%v", props)
 	}
 	// Значок — только меню: левый щелчок его открывает и в KDE, и в GNOME.
@@ -273,7 +273,7 @@ func TestPropertiesAsHostsReadThem(t *testing.T) {
 	if err := dbus.Store([]any{props["ToolTip"].Value()}, &tip); err != nil {
 		t.Fatal(err)
 	}
-	if tip.Title != "vpnlock" || tip.Text != "Приложения без сети. VPN выключен" {
+	if tip.Title != "appguard" || tip.Text != "Приложения без сети. VPN выключен" {
 		t.Errorf("подсказка %+v", tip)
 	}
 

@@ -4,11 +4,11 @@ package paths
 import "path/filepath"
 
 // Label — имя службы в launchd.
-const Label = "com.vpnlock.daemon"
+const Label = "com.appguard.daemon"
 
 // CatalogLabel — имя ежедневной задачи каталога в launchd: она работает в
 // сеансе ученика, от его имени.
-const CatalogLabel = "com.vpnlock.catalog"
+const CatalogLabel = "com.appguard.catalog"
 
 // AgentPlist — описание ежедневной задачи каталога в домашнем каталоге home.
 func AgentPlist(home string) string {
@@ -16,7 +16,7 @@ func AgentPlist(home string) string {
 }
 
 // TrayLabel — имя значка службы в launchd: он работает в сеансе ученика.
-const TrayLabel = "com.vpnlock.tray"
+const TrayLabel = "com.appguard.tray"
 
 // TrayPlist — описание значка в домашнем каталоге home.
 func TrayPlist(home string) string {
@@ -25,7 +25,7 @@ func TrayPlist(home string) string {
 
 // TrayLog — вывод значка в домашнем каталоге home.
 func TrayLog(home string) string {
-	return filepath.Join(home, "Library", "Logs", "vpnlock-tray.log")
+	return filepath.Join(home, "Library", "Logs", "appguard-tray.log")
 }
 
 // Layout — пути установки. Все они вне репозитория: настройки принадлежат
@@ -41,12 +41,12 @@ type Layout struct {
 	Plist       string // описание службы для launchd
 	LogDir      string
 	LogFile     string // вывод службы: старт, остановка, ошибки
-	CommandLink string // команда vpnlock в PATH пользователя
+	CommandLink string // команда appguard в PATH пользователя
 	AgentFile   string // чья ежедневная задача каталога стоит: для удаления
-	CloneFile   string // из какого клона поставлен vpnlock: оттуда его обновляет `vpnlock update`
+	CloneFile   string // из какого клона поставлен appguard: оттуда его обновляет `appguard update`
 }
 
-// Traces — что остаётся на диске от установки: есть хоть одно — vpnlock
+// Traces — что остаётся на диске от установки: есть хоть одно — appguard
 // установлен.
 func (L Layout) Traces() []string { return []string{L.Plist, L.AppDir} }
 
@@ -57,21 +57,31 @@ func System() Layout { return Under("/") }
 // установку во временной папке.
 func Under(root string) Layout {
 	at := func(elem ...string) string { return filepath.Join(append([]string{root}, elem...)...) }
-	app := at("Library", "Application Support", "vpnlock")
+	app := at("Library", "Application Support", "appguard")
 	state := filepath.Join(app, "state")
-	logs := at("Library", "Logs", "vpnlock")
+	logs := at("Library", "Logs", "appguard")
 	return Layout{
 		AppDir:      app,
-		Binary:      filepath.Join(app, "bin", "vpnlock"),
+		Binary:      filepath.Join(app, "bin", "appguard"),
 		StateDir:    state,
 		ConfigFile:  filepath.Join(state, "config.json"),
 		LockFile:    filepath.Join(state, "daemon.lock"),
-		Socket:      at("var", "run", "vpnlock.sock"),
+		Socket:      at("var", "run", "appguard.sock"),
 		Plist:       at("Library", "LaunchDaemons", Label+".plist"),
 		LogDir:      logs,
 		LogFile:     filepath.Join(logs, "daemon.log"),
-		CommandLink: at("usr", "local", "bin", "vpnlock"),
+		CommandLink: at("usr", "local", "bin", "appguard"),
 		AgentFile:   filepath.Join(app, "catalog-agent.json"),
 		CloneFile:   filepath.Join(app, "clone"),
 	}
+}
+
+// LegacySystem и LegacyUnder — где лежит установка под прежним именем vpnlock
+// (до 0.23.0): её бинарник и настройки. Установка appguard забирает настройки и
+// снимает её этим бинарником.
+func LegacySystem() (binary, state string) { return LegacyUnder("/") }
+
+func LegacyUnder(root string) (binary, state string) {
+	app := filepath.Join(root, "Library", "Application Support", "vpnlock")
+	return filepath.Join(app, "bin", "vpnlock"), filepath.Join(app, "state")
 }

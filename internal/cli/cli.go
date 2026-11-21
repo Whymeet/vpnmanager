@@ -1,4 +1,4 @@
-// Package cli — команды vpnlock для человека. Команды и их аргументы —
+// Package cli — команды appguard для человека. Команды и их аргументы —
 // по-английски, меню и сообщения — по-русски.
 package cli
 
@@ -17,11 +17,11 @@ import (
 	"strings"
 	"time"
 
-	"vpnlock/internal/apps"
-	"vpnlock/internal/core"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/paths"
-	"vpnlock/internal/tray"
+	"appguard/internal/apps"
+	"appguard/internal/core"
+	"appguard/internal/ipc"
+	"appguard/internal/paths"
+	"appguard/internal/tray"
 )
 
 // Env — с чем работают команды: пути, ввод-вывод и действия, которые делает root.
@@ -37,7 +37,7 @@ type Env struct {
 	Install func() (note string, err error)
 	// Uninstall снимает установку на месте. Только от root.
 	Uninstall func() error
-	// Update собирает vpnlock в клоне от имени человека и ставит новую версию
+	// Update собирает appguard в клоне от имени человека и ставит новую версию
 	// поверх прежней. Только от root.
 	Update func(clone string) error
 	// Raw переводит терминал в посимвольный режим для меню; nil — ввод читается
@@ -141,34 +141,34 @@ func Run(args []string, env Env) int {
 }
 
 func usage(w io.Writer) {
-	fmt.Fprintf(w, `vpnlock — приложения выходят в сеть только через проверенный VPN.
+	fmt.Fprintf(w, `appguard — приложения выходят в сеть только через проверенный VPN.
 
-vpnlock без команды открывает меню: всё выбирается стрелками.
+appguard без команды открывает меню: всё выбирается стрелками.
 
 Команды:
-  vpnlock add [имя|путь]              защитить приложение или консольную программу (claude); без имени — выбор из списка
-  vpnlock remove [имя] [--yes]        снять защиту с приложения
-  vpnlock rule [any|mine]             какое правило действует или сменить его
-  vpnlock remember [имя] [адрес]      запомнить текущий выход VPN под именем; с адресом — без подключения
-  vpnlock forget <выход>              убрать выход из моих — по имени или адресу
-  vpnlock forget <имя> <адрес>...     убрать у приложения адрес или домен, выученный по ошибке
-  vpnlock notifications [on|off]      уведомления об открытии и закрытии сервисов (журнал пишется всегда)
-  vpnlock status [приложение]         служба, правило, VPN и выход, приложения; с именем — что выучило приложение
-  vpnlock check                       правила, выход, сервисы мимо VPN, «безопасный DNS» браузеров
-  vpnlock log                         события в реальном времени (выход — Ctrl+C)
-  vpnlock update [клон]               после git pull: пересобрать и поставить новую версию (с правами администратора)
-  vpnlock uninstall [--yes]           снять службу и всё, что поставила установка
-  vpnlock catalog load [файл]         дать службе каталог (по умолчанию catalog/catalog.json клона)
-  vpnlock catalog export [файл]       выученное на этом маке — в каталог клона или в файл для vpnlock import
-  vpnlock catalog sync [клон]         git pull в клоне и каталог — службе (это раз в сутки делает задача)
+  appguard add [имя|путь]              защитить приложение или консольную программу (claude); без имени — выбор из списка
+  appguard remove [имя] [--yes]        снять защиту с приложения
+  appguard rule [any|mine]             какое правило действует или сменить его
+  appguard remember [имя] [адрес]      запомнить текущий выход VPN под именем; с адресом — без подключения
+  appguard forget <выход>              убрать выход из моих — по имени или адресу
+  appguard forget <имя> <адрес>...     убрать у приложения адрес или домен, выученный по ошибке
+  appguard notifications [on|off]      уведомления об открытии и закрытии сервисов (журнал пишется всегда)
+  appguard status [приложение]         служба, правило, VPN и выход, приложения; с именем — что выучило приложение
+  appguard check                       правила, выход, сервисы мимо VPN, «безопасный DNS» браузеров
+  appguard log                         события в реальном времени (выход — Ctrl+C)
+  appguard update [клон]               после git pull: пересобрать и поставить новую версию (с правами администратора)
+  appguard uninstall [--yes]           снять службу и всё, что поставила установка
+  appguard catalog load [файл]         дать службе каталог (по умолчанию catalog/catalog.json клона)
+  appguard catalog export [файл]       выученное на этом маке — в каталог клона или в файл для appguard import
+  appguard catalog sync [клон]         git pull в клоне и каталог — службе (это раз в сутки делает задача)
 
 Защита без приложения — по домену или адресу:
-  vpnlock protect <домен|адрес>...    закрыть адреса сервиса везде, кроме проверенного VPN
-  vpnlock unprotect <домен|адрес>...  снять защиту с домена или адреса
-  vpnlock import <файл>               закрыть сразу всё из файла: выгрузка catalog export или список доменов и адресов
+  appguard protect <домен|адрес>...    закрыть адреса сервиса везде, кроме проверенного VPN
+  appguard unprotect <домен|адрес>...  снять защиту с домена или адреса
+  appguard import <файл>               закрыть сразу всё из файла: выгрузка catalog export или список доменов и адресов
 
 Конфиг — программы, домены и настройки одним файлом:
-  vpnlock apply [файл]                применить конфиг; без файла — конфиг этой системы из клона, configs/%s
+  appguard apply [файл]                применить конфиг; без файла — конфиг этой системы из клона, configs/%s
 
 Установка и обновление — по setup/README.md в клоне репозитория.
 `, configName(runtime.GOOS))
@@ -180,7 +180,7 @@ vpnlock без команды открывает меню: всё выбирае
 // идут, код выхода скажет, что не всё.
 func protect(env Env, cmd string, args []string) int {
 	if len(args) == 0 || slices.Contains(args, "") {
-		fmt.Fprintf(env.Err, "Укажи домен или адрес, можно несколько через пробел: vpnlock %s notion.so claude.ai 160.79.104.10\n", cmd)
+		fmt.Fprintf(env.Err, "Укажи домен или адрес, можно несколько через пробел: appguard %s notion.so claude.ai 160.79.104.10\n", cmd)
 		return 2
 	}
 	ipcCmd := ipc.CmdProtect
@@ -269,7 +269,7 @@ func status(env Env) int {
 			fmt.Fprintf(env.Out, "Каталог: %s, %d %s\n", dayText(st.Catalog), st.CatalogN, core.Plural(st.CatalogN, "приложение", "приложения", "приложений"))
 		}
 		if st.CatalogStale > 0 {
-			fmt.Fprintf(env.Out, "  не обновлялся %d %s — обнови вручную: git pull в клоне, затем vpnlock catalog load\n",
+			fmt.Fprintf(env.Out, "  не обновлялся %d %s — обнови вручную: git pull в клоне, затем appguard catalog load\n",
 				st.CatalogStale, core.Plural(st.CatalogStale, "день", "дня", "дней"))
 		}
 		if st.SyncProblem != "" {
@@ -283,7 +283,7 @@ func status(env Env) int {
 	case st.Apps == nil:
 		// Служба старой версии о приложениях не сообщает.
 	case len(st.Apps) == 0:
-		fmt.Fprintln(env.Out, "Приложения: пока ни одного — добавить: vpnlock add")
+		fmt.Fprintln(env.Out, "Приложения: пока ни одного — добавить: appguard add")
 	default:
 		fmt.Fprintln(env.Out, "Приложения:")
 		for _, a := range st.Apps {
@@ -326,7 +326,7 @@ func journalContext(ctx context.Context, env Env) int {
 			return errors.New(r.Error)
 		}
 		if !header {
-			fmt.Fprintln(env.Out, "Журнал vpnlock: события за неделю и новые по мере появления. Выход — Ctrl+C.")
+			fmt.Fprintln(env.Out, "Журнал appguard: события за неделю и новые по мере появления. Выход — Ctrl+C.")
 			header = true
 		}
 		if r.Event != nil {
@@ -369,7 +369,7 @@ func silent(env Env, err error) int {
 		return 1
 	}
 	if !installed(env.Layout) {
-		fmt.Fprintln(env.Out, "vpnlock не установлен. Установка — по setup/README.md в клоне репозитория.")
+		fmt.Fprintln(env.Out, "appguard не установлен. Установка — по setup/README.md в клоне репозитория.")
 		return 1
 	}
 	fmt.Fprintln(env.Out, "Служба: не отвечает — защита держится: правила файрвола остаются в системе, сервисы закрыты.")
@@ -397,7 +397,7 @@ func install(env Env) int {
 		}
 		return 1
 	}
-	fmt.Fprintf(env.Out, "· Ставлю службу vpnlock %s\n", env.Version)
+	fmt.Fprintf(env.Out, "· Ставлю службу appguard %s\n", env.Version)
 	note, err := env.Install()
 	if note != "" {
 		fmt.Fprintf(env.Out, "· %s\n", note)
@@ -412,19 +412,19 @@ func install(env Env) int {
 		return 1
 	}
 	if runtime.GOOS == "windows" {
-		fmt.Fprintf(env.Out, `✓ Служба vpnlock %s работает и будет стартовать вместе с системой.
-  Проверить: vpnlock status — в новом окне PowerShell: в открытых окнах команды ещё нет.
+		fmt.Fprintf(env.Out, `✓ Служба appguard %s работает и будет стартовать вместе с системой.
+  Проверить: appguard status — в новом окне PowerShell: в открытых окнах команды ещё нет.
 `, st.Version)
 		return 0
 	}
 	if runtime.GOOS == "linux" {
-		fmt.Fprintf(env.Out, "✓ Служба vpnlock %s работает и будет стартовать вместе с системой.\n  Проверить: vpnlock status\n", st.Version)
+		fmt.Fprintf(env.Out, "✓ Служба appguard %s работает и будет стартовать вместе с системой.\n  Проверить: appguard status\n", st.Version)
 		return 0
 	}
-	fmt.Fprintf(env.Out, `✓ Служба vpnlock %s работает и будет стартовать вместе с системой.
-  Проверить: vpnlock status
+	fmt.Fprintf(env.Out, `✓ Служба appguard %s работает и будет стартовать вместе с системой.
+  Проверить: appguard status
 
-macOS может показать уведомление «Добавлены фоновые объекты» — это служба vpnlock.
+macOS может показать уведомление «Добавлены фоновые объекты» — это служба appguard.
 Не выключай её в Системных настройках → Основные → Объекты входа: иначе после
 перезагрузки служба не стартует.
 `, st.Version)
@@ -449,7 +449,7 @@ func waitStatus(socket string) (*ipc.Status, error) {
 	}
 }
 
-const uninstallWarning = `vpnlock будет удалён: служба и все её правила снимаются, защищённые приложения
+const uninstallWarning = `appguard будет удалён: служба и все её правила снимаются, защищённые приложения
 начнут выходить в сеть с домашнего адреса.
 Удалить? Напиши «да»: `
 
@@ -457,19 +457,19 @@ func uninstall(env Env, args []string) int {
 	yes := false
 	for _, a := range args {
 		if a != "--yes" && a != "-y" {
-			fmt.Fprintf(env.Err, "«uninstall» снимает весь vpnlock и принимает только --yes, а получено «%s». Ничего не изменено.\n", a)
+			fmt.Fprintf(env.Err, "«uninstall» снимает весь appguard и принимает только --yes, а получено «%s». Ничего не изменено.\n", a)
 			return 2
 		}
 		yes = true
 	}
 	if !installed(env.Layout) {
-		fmt.Fprintln(env.Out, "vpnlock не установлен — удалять нечего.")
+		fmt.Fprintln(env.Out, "appguard не установлен — удалять нечего.")
 		return 0
 	}
 	// На Windows служба сама себя не снимает: удаляют на месте, из PowerShell
 	// от имени администратора. Без этого и спрашивать незачем.
 	if runtime.GOOS == "windows" && !env.Root {
-		fmt.Fprintln(env.Err, "Удалить vpnlock можно только из PowerShell, открытого от имени администратора: в меню «Пуск» найди «PowerShell», правой кнопкой — «Запуск от имени администратора», и повтори там vpnlock uninstall. Ничего не изменено.")
+		fmt.Fprintln(env.Err, "Удалить appguard можно только из PowerShell, открытого от имени администратора: в меню «Пуск» найди «PowerShell», правой кнопкой — «Запуск от имени администратора», и повтори там appguard uninstall. Ничего не изменено.")
 		return 1
 	}
 	if !yes {
@@ -492,7 +492,7 @@ func uninstall(env Env, args []string) int {
 	} else if code := uninstallViaService(env); code != 0 {
 		return code
 	}
-	fmt.Fprintln(env.Out, "✓ vpnlock удалён: служба снята, файлы установки убраны. Папка клона осталась — это обычная папка.")
+	fmt.Fprintln(env.Out, "✓ appguard удалён: служба снята, файлы установки убраны. Папка клона осталась — это обычная папка.")
 	return 0
 }
 
@@ -501,7 +501,7 @@ func uninstall(env Env, args []string) int {
 func uninstallViaService(env Env) int {
 	resp, err := ipc.CallWait(env.Layout.Socket, ipc.Request{Cmd: ipc.CmdUninstall}, removeWait)
 	if errors.Is(err, ipc.ErrNotRunning) {
-		fmt.Fprintln(env.Err, "Служба не отвечает, поэтому без пароля удалить не выйдет. С паролем администратора: sudo vpnlock uninstall")
+		fmt.Fprintln(env.Err, "Служба не отвечает, поэтому без пароля удалить не выйдет. С паролем администратора: sudo appguard uninstall")
 		return 1
 	}
 	if err != nil {

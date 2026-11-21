@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"vpnlock/internal/core"
+	"appguard/internal/core"
 )
 
 // resolveHost — адреса узла прокси: на них файрвол закрывает порт. Обычно это

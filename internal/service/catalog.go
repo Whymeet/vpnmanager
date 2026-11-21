@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
-	"vpnlock/internal/apps"
-	"vpnlock/internal/catalog"
-	"vpnlock/internal/config"
-	"vpnlock/internal/core"
-	"vpnlock/internal/learn"
+	"appguard/internal/apps"
+	"appguard/internal/catalog"
+	"appguard/internal/config"
+	"appguard/internal/core"
+	"appguard/internal/learn"
 )
 
 // catalogFile — где служба хранит каталог, по которому защищает.

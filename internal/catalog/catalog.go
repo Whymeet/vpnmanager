@@ -15,8 +15,8 @@ import (
 
 	"golang.org/x/net/publicsuffix"
 
-	"vpnlock/internal/learn"
-	"vpnlock/internal/resolver"
+	"appguard/internal/learn"
+	"appguard/internal/resolver"
 )
 
 // InClone — где каталог лежит в клоне репозитория.
@@ -59,7 +59,7 @@ type Windows struct {
 
 // ErrNewer — каталог записан более новой версией формата: эта сборка его не
 // применяет и действует по прежнему каталогу.
-var ErrNewer = errors.New("каталог записан более новой версией vpnlock — обнови инструмент, а пока действует прежний каталог")
+var ErrNewer = errors.New("каталог записан более новой версией appguard — обнови инструмент, а пока действует прежний каталог")
 
 // Parse разбирает каталог. Записи, которых не может быть, отбрасываются, а
 // warnings объясняют, что отброшено: пустой идентификатор, не домен, адрес,

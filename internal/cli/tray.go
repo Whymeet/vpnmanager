@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/tray"
+	"appguard/internal/ipc"
+	"appguard/internal/tray"
 )
 
 // Как часто значок спрашивает службу и сколько ждёт ответа. Картинка отстаёт от
@@ -59,7 +59,7 @@ func trayCmd(env Env) int {
 				return ipc.Protection{}, err
 			case resp.Protection == nil:
 				// Служба старше значка: отвечает, но защиту не называет — открыто без
-				// выхода значок показывает как «vpnlock работает».
+				// выхода значок показывает как «appguard работает».
 				return ipc.Protection{Open: true}, nil
 			}
 			return *resp.Protection, nil

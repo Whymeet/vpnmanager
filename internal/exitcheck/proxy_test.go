@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/core"
+	"appguard/internal/core"
 )
 
 // Запросы пути через прокси идут через сам прокси: страницу отдаёт тот, до кого

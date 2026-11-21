@@ -28,10 +28,10 @@ func TestClosedRulesBlockEverywhere(t *testing.T) {
 		t.Fatalf("без проверенного туннеля в правилах есть пропуск:\n%s", rules)
 	}
 	for _, want := range []string{
-		"table <vpnlock4> persist",
-		"table <vpnlock6> persist",
-		"block drop out quick inet from any to <vpnlock4>",
-		"block drop out quick inet6 from any to <vpnlock6>",
+		"table <appguard4> persist",
+		"table <appguard6> persist",
+		"block drop out quick inet from any to <appguard4>",
+		"block drop out quick inet6 from any to <appguard6>",
 	} {
 		if !strings.Contains(rules, want) {
 			t.Fatalf("нет %q:\n%s", want, rules)
@@ -51,12 +51,12 @@ func TestTableInputListsEveryAddress(t *testing.T) {
 
 func TestOpenRulesPassOnlyVerifiedTunnel(t *testing.T) {
 	rules := anchorRules(Rules{OpenIfaces: []string{"utun11"}, V4: v4, V6: v6})
-	block := strings.Index(rules, "block drop out quick inet from any to <vpnlock4>")
+	block := strings.Index(rules, "block drop out quick inet from any to <appguard4>")
 	for _, pass := range []string{
-		"pass out quick on utun11 inet proto tcp from any to <vpnlock4> flags any keep state (if-bound)",
-		"pass out quick on utun11 inet from any to <vpnlock4> keep state (if-bound)",
-		"pass out quick on utun11 inet6 proto tcp from any to <vpnlock6> flags any keep state (if-bound)",
-		"pass out quick on utun11 inet6 from any to <vpnlock6> keep state (if-bound)",
+		"pass out quick on utun11 inet proto tcp from any to <appguard4> flags any keep state (if-bound)",
+		"pass out quick on utun11 inet from any to <appguard4> keep state (if-bound)",
+		"pass out quick on utun11 inet6 proto tcp from any to <appguard6> flags any keep state (if-bound)",
+		"pass out quick on utun11 inet6 from any to <appguard6> keep state (if-bound)",
 	} {
 		i := strings.Index(rules, pass)
 		if i < 0 || block < 0 || i > block {
@@ -68,7 +68,7 @@ func TestOpenRulesPassOnlyVerifiedTunnel(t *testing.T) {
 	}
 	// Для TCP правило с flags any стоит раньше общего: иначе общее поймало бы
 	// TCP без flags any, и состояние посреди потока не создалось бы.
-	if strings.Index(rules, "proto tcp from any to <vpnlock4> flags any") > strings.Index(rules, "inet from any to <vpnlock4> keep state") {
+	if strings.Index(rules, "proto tcp from any to <appguard4> flags any") > strings.Index(rules, "inet from any to <appguard4> keep state") {
 		t.Fatalf("правило для TCP стоит позже общего:\n%s", rules)
 	}
 	pfParses(t, rules)
@@ -130,7 +130,7 @@ func TestRulesEqualSeesProxies(t *testing.T) {
 
 func TestVPNServerOnProtectedAddressPassesOnlyOnPhysical(t *testing.T) {
 	rules := anchorRules(Rules{V4: v4, V6: v6, Servers: []netip.Addr{v4[0], v6[0]}, Physical: "en0"})
-	block := strings.Index(rules, "block drop out quick inet from any to <vpnlock4>")
+	block := strings.Index(rules, "block drop out quick inet from any to <appguard4>")
 	for _, pass := range []string{
 		"pass out quick on en0 inet proto tcp from any to 104.18.0.1 flags any keep state (if-bound)",
 		"pass out quick on en0 inet from any to 104.18.0.1 keep state (if-bound)",
@@ -156,7 +156,7 @@ func TestCountRules(t *testing.T) {
 	if n := countRules([]byte(anchorRules(r))); n != 7 {
 		t.Fatalf("%d правил:\n%s", n, anchorRules(r))
 	}
-	shown := "block drop out quick proto tcp from any to 127.0.0.1 port = 7890 user != 0\npass out quick on utun11 inet proto tcp from any to <vpnlock4> flags any keep state (if-bound)\n"
+	shown := "block drop out quick proto tcp from any to 127.0.0.1 port = 7890 user != 0\npass out quick on utun11 inet proto tcp from any to <appguard4> flags any keep state (if-bound)\n"
 	if n := countRules([]byte(shown)); n != 2 {
 		t.Fatalf("%d", n)
 	}

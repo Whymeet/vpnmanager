@@ -1,5 +1,5 @@
 #!/bin/bash
-# Установка vpnlock на Linux — одной командой из клона, в терминале:
+# Установка appguard на Linux — одной командой из клона, в терминале:
 #
 #   ./install.cmd
 #
@@ -15,7 +15,7 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SELF="$REPO/install.cmd"
-BIN="$REPO/bin/vpnlock"
+BIN="$REPO/bin/appguard"
 
 section() { printf '\n[%d/6] %s\n' "$1" "$2"; }
 step() { printf '  · %s\n' "$*"; }
@@ -32,7 +32,7 @@ if [ "$(id -u)" -eq 0 ]; then
   exec sudo -H -u "$SUDO_USER" "$SELF" "$@"
 fi
 
-printf 'Установка vpnlock на этот компьютер. Клон: %s\n' "$REPO"
+printf 'Установка appguard на этот компьютер. Клон: %s\n' "$REPO"
 
 "$REPO/setup/linux/prepare.sh" --install
 
@@ -67,24 +67,24 @@ fi
 # Значок не защищает, поэтому шаг не может прервать установку: не вышло — он скажет
 # почему, и установка идёт дальше.
 section 5 "Ставлю значок рядом с часами"
-bash "$REPO/setup/linux/tray.sh" /opt/vpnlock/bin/vpnlock 2>&1 | indent || true
+bash "$REPO/setup/linux/tray.sh" /opt/appguard/bin/appguard 2>&1 | indent || true
 
 section 6 "Проверяю службу"
-"$BIN" status 2>&1 | indent || fail "Служба не отвечает. Причина — в /var/log/vpnlock/daemon.log."
+"$BIN" status 2>&1 | indent || fail "Служба не отвечает. Причина — в /var/log/appguard/daemon.log."
 
 cat <<'DONE'
 
-✓ Готово: vpnlock установлен и стартует вместе с системой.
+✓ Готово: appguard установлен и стартует вместе с системой.
 
 Дальше — три шага, без sudo:
-  vpnlock apply            программы и сервисы из конфига курса (configs/linux.conf)
-  vpnlock remember <имя>   свой выход VPN: подключи VPN и запомни; повтори для каждого
-  vpnlock rule mine        сервисы открыты только через твои выходы
+  appguard apply            программы и сервисы из готового конфига (configs/linux.conf)
+  appguard remember <имя>   свой выход VPN: подключи VPN и запомни; повтори для каждого
+  appguard rule mine        сервисы открыты только через твои выходы
 
 Защитить что-то своё — одна команда, сразу и без обучения:
-  vpnlock add firefox        программа или служба по имени
-  vpnlock add /opt/app/run   или по пути
+  appguard add firefox        программа или служба по имени
+  appguard add /opt/app/run   или по пути
 
-  vpnlock status   что защищено и какой выход сейчас
-  vpnlock help     все команды
+  appguard status   что защищено и какой выход сейчас
+  appguard help     все команды
 DONE

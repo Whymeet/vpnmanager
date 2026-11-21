@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"vpnlock/internal/ipc"
+	"appguard/internal/ipc"
 )
 
 // Решение о правах сверяется с самой macOS: dsmemberutil — её ответ на вопрос

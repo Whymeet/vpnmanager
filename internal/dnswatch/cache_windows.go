@@ -9,7 +9,7 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"vpnlock/internal/resolver"
+	"appguard/internal/resolver"
 )
 
 // На Windows пакеты так просто не послушать (нужен драйвер), зато ответы,

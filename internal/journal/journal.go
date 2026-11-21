@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"vpnlock/internal/core"
+	"appguard/internal/core"
 )
 
 // Keep — сколько хранятся события.

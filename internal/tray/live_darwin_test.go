@@ -33,7 +33,7 @@ func TestLiveIconShowsAndHides(t *testing.T) {
 		t.Fatalf("значок умер после смены вида: %v", err)
 	case <-time.After(2 * time.Second):
 	}
-	if !utf8.ValidString(script) || !strings.Contains(script, "vpnlock") {
+	if !utf8.ValidString(script) || !strings.Contains(script, "appguard") {
 		t.Fatal("скрипт испорчен")
 	}
 	gone := s.gone

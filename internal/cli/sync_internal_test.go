@@ -5,7 +5,7 @@ import "testing"
 // Что отвечает git, когда доступа к репозиторию курса больше нет.
 func TestAccessDeniedIsRecognized(t *testing.T) {
 	for _, out := range []string{
-		"remote: Repository not found.\nfatal: repository 'https://github.com/vibecamp-course/vpnlock.git/' not found",
+		"remote: Repository not found.\nfatal: repository 'https://github.com/XoDefender/appguard.git/' not found",
 		"git@github.com: Permission denied (publickey).\nfatal: Could not read from remote repository.",
 		"fatal: could not read Username for 'https://github.com': terminal prompts disabled",
 		"remote: Write access to repository not granted.\nfatal: unable to access 'https://github.com/x/y.git/': The requested URL returned error: 403",

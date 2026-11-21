@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/core"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/core"
+	"appguard/internal/ipc"
+	"appguard/internal/service/servicetest"
 )
 
 // Сценарии таски 11, К26 и таски 45: при каждом закрытии сервисов — одно

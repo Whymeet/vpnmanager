@@ -22,9 +22,9 @@ const Dir = "/etc/resolver"
 
 // marker — первая строка наших файлов: по ней удаление узнаёт своё и не
 // трогает чужое.
-const marker = "# vpnlock"
+const marker = "# appguard"
 
-// Resolvers — доменные резолверы vpnlock.
+// Resolvers — доменные резолверы appguard.
 type Resolvers struct {
 	Dir  string         // каталог файлов; в тестах — временный
 	Addr netip.AddrPort // где слушает резолвер службы
@@ -91,7 +91,7 @@ func (r Resolvers) Clear() error {
 }
 
 func (r Resolvers) content() []byte {
-	return fmt.Appendf(nil, "%s: имена этого домена разрешает служба vpnlock, файл снимет «vpnlock uninstall»\nnameserver %s\nport %d\n",
+	return fmt.Appendf(nil, "%s: имена этого домена разрешает служба appguard, файл снимет «appguard uninstall»\nnameserver %s\nport %d\n",
 		marker, r.Addr.Addr(), r.Addr.Port())
 }
 

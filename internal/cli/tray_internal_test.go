@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/service/servicetest"
-	"vpnlock/internal/tray"
+	"appguard/internal/service/servicetest"
+	"appguard/internal/tray"
 )
 
 // testIcon — показ значка в тесте; служба и сокет настоящие.
@@ -85,7 +85,7 @@ func fastTray(t *testing.T) {
 
 // Значок за настоящей службой: появляется при её ответе, исчезает, когда она
 // остановилась, зависшая служба его тоже гасит, вернувшаяся — возвращает, а удаление
-// vpnlock завершает значок.
+// appguard завершает значок.
 func TestTrayFollowsRealService(t *testing.T) {
 	fastTray(t)
 	root := t.TempDir()
@@ -130,7 +130,7 @@ func TestTrayFollowsRealService(t *testing.T) {
 			t.Fatalf("значок вышел с кодом %d", code)
 		}
 	case <-time.After(3 * time.Second):
-		t.Fatal("значок не вышел после удаления vpnlock")
+		t.Fatal("значок не вышел после удаления appguard")
 	}
 	if icon.shown() {
 		t.Fatal("значок остался после удаления")
@@ -147,7 +147,7 @@ func TestTrayShowsProtectionAndSwitchesNotifications(t *testing.T) {
 	done := make(chan int, 1)
 	go func() { done <- trayCmd(env) }()
 	t.Cleanup(func() {
-		os.RemoveAll(s.Layout.AppDir) // значок выходит сам, когда vpnlock удалён
+		os.RemoveAll(s.Layout.AppDir) // значок выходит сам, когда appguard удалён
 		s.Stop()
 		<-done
 	})

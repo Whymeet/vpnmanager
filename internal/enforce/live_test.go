@@ -4,8 +4,8 @@
 // нельзя (кэш сборки станет чужим), поэтому тест собирается обычным
 // пользователем и запускается собранным файлом:
 //
-//	tools/go test -c -tags live -o /tmp/vpnlock-enforce.test ./internal/enforce
-//	sudo /tmp/vpnlock-enforce.test -test.v -test.run Live
+//	tools/go test -c -tags live -o /tmp/appguard-enforce.test ./internal/enforce
+//	sudo /tmp/appguard-enforce.test -test.v -test.run Live
 //
 // Закрывает и открывает только адреса example.com и порт временного «прокси»
 // на петле, а в конце снимает всё.
@@ -30,7 +30,7 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/netwatch"
+	"appguard/internal/netwatch"
 )
 
 func TestLivePFClosesAndOpens(t *testing.T) {

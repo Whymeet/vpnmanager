@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"vpnlock/internal/paths"
+	"appguard/internal/paths"
 )
 
 // Launchd — службы launchd в системном домене.
@@ -43,6 +43,8 @@ type Installer struct {
 	// остановки службы (иначе её сторож вернул бы правила) и до удаления файлов:
 	// токен pf лежит в каталоге службы. nil — снимать нечего.
 	Clear func() error
+	// Legacy — прежняя установка vpnlock: забрать настройки и снять. nil — не искать.
+	Legacy *Legacy
 }
 
 // Agent — ежедневная задача каталога в сеансе пользователя.
@@ -64,6 +66,10 @@ func (in *Installer) Install(src string) error {
 	if err := in.commandFree(); err != nil {
 		return err
 	}
+	carry, err := in.takeLegacy()
+	if err != nil {
+		return err
+	}
 	if err := in.Launchd.Bootout(paths.Label); err != nil {
 		return fmt.Errorf("не удалось остановить прежнюю службу: %w", err)
 	}
@@ -81,13 +87,17 @@ func (in *Installer) Install(src string) error {
 			return err
 		}
 	}
+	moved, err := in.restoreLegacy(carry)
+	if err != nil {
+		return err
+	}
 	// Системные каталоги не наши: их создаём, только если нет, и не трогаем
 	// права существующих (/usr/local/bin у Homebrew принадлежит пользователю).
 	if err := os.MkdirAll(filepath.Dir(L.Plist), 0o755); err != nil {
 		return err
 	}
 	if err := copyFile(src, L.Binary, 0o755); err != nil {
-		return fmt.Errorf("не удалось скопировать vpnlock: %w", err)
+		return fmt.Errorf("не удалось скопировать appguard: %w", err)
 	}
 	note, err := in.installCatalog(src)
 	if err != nil {
@@ -111,6 +121,7 @@ func (in *Installer) Install(src string) error {
 	}
 	in.Note = joinNotes(in.Note, in.installAgent(src))
 	in.Note = joinNotes(in.Note, in.installTray())
+	in.Note = joinNotes(in.Note, moved)
 	return nil
 }
 
@@ -173,7 +184,7 @@ func (in *Installer) installTray() string {
 		// Без сеанса (вход по SSH) значок загрузится при следующем входе.
 		return "Значок появится в строке меню после следующего входа в систему."
 	}
-	return "Значок vpnlock — в строке меню, рядом с часами: щит с замком — защищённые приложения в сети, перечёркнутый щит — без сети. По щелчку — что с защитой и выключатель уведомлений."
+	return "Значок appguard — в строке меню, рядом с часами: щит с замком — защищённые приложения в сети, перечёркнутый щит — без сети. По щелчку — что с защитой и выключатель уведомлений."
 }
 
 // removeAgent снимает то, что стоит в сеансе пользователя: ежедневную задачу каталога
@@ -217,14 +228,14 @@ func chownTo(path string, a *Agent) error {
 }
 
 // agentPlist — ежедневная задача каталога: раз в сутки и при входе в систему
-// `vpnlock catalog sync <клон>` от имени пользователя.
+// `appguard catalog sync <клон>` от имени пользователя.
 func agentPlist(L paths.Layout, a *Agent) []byte {
 	esc := func(s string) string {
 		var b strings.Builder
 		xml.EscapeText(&b, []byte(s))
 		return b.String()
 	}
-	logFile := filepath.Join(a.Home, "Library", "Logs", "vpnlock-catalog.log")
+	logFile := filepath.Join(a.Home, "Library", "Logs", "appguard-catalog.log")
 	return fmt.Appendf(nil, `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -253,8 +264,8 @@ func agentPlist(L paths.Layout, a *Agent) []byte {
 `, esc(paths.CatalogLabel), esc(L.Binary), esc(a.Clone), esc(logFile), esc(logFile))
 }
 
-// trayPlist — значок службы: при входе в графический сеанс `vpnlock tray` от имени
-// пользователя. Упал — launchd поднимает его снова; вышел сам (vpnlock удалён) — нет.
+// trayPlist — значок службы: при входе в графический сеанс `appguard tray` от имени
+// пользователя. Упал — launchd поднимает его снова; вышел сам (appguard удалён) — нет.
 // AbandonProcessGroup не задан: launchd при смерти задачи снимает её группу процессов,
 // иначе osascript пережил бы родителя и значок соврал бы. ProcessType не Background:
 // система не должна придерживать интерфейс.

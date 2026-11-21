@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"vpnlock/internal/core"
+	"appguard/internal/core"
 )
 
 // Fetcher достаёт страницу запросом, который уходит только через интерфейс

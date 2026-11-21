@@ -1,4 +1,4 @@
-// Package service — служба vpnlock: держит настройки и отвечает клиентам по
+// Package service — служба appguard: держит настройки и отвечает клиентам по
 // локальному каналу. Всё, что трогает систему, приходит адаптерами (Deps),
 // поэтому тесты гоняют службу целиком с подменёнными адаптерами.
 package service
@@ -16,15 +16,15 @@ import (
 	"sync"
 	"time"
 
-	"vpnlock/internal/apps"
-	"vpnlock/internal/config"
-	"vpnlock/internal/core"
-	"vpnlock/internal/enforce"
-	"vpnlock/internal/exitcheck"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/journal"
-	"vpnlock/internal/paths"
-	"vpnlock/internal/resolver"
+	"appguard/internal/apps"
+	"appguard/internal/config"
+	"appguard/internal/core"
+	"appguard/internal/enforce"
+	"appguard/internal/exitcheck"
+	"appguard/internal/ipc"
+	"appguard/internal/journal"
+	"appguard/internal/paths"
+	"appguard/internal/resolver"
 )
 
 // Accounts — учётные записи компьютера.
@@ -100,7 +100,7 @@ type SystemDNS interface {
 	// Set направляет на резолвер службы ровно эти домены; skipped — домены, у
 	// которых уже есть чужой резолвер.
 	Set(domains []string) (skipped []string, err error)
-	// Clear убирает всё, что направлял vpnlock.
+	// Clear убирает всё, что направлял appguard.
 	Clear() error
 }
 
@@ -108,7 +108,7 @@ type SystemDNS interface {
 // программе адресами шифрованного.
 const russianWait = 1500 * time.Millisecond
 
-// journalTail — сколько последних событий показывает `vpnlock log` при открытии.
+// journalTail — сколько последних событий показывает `appguard log` при открытии.
 const journalTail = 50
 
 // stopGrace — сколько служба после удаления ждёт, что система её снимет, прежде
@@ -421,7 +421,7 @@ func (s *service) handle(peer ipc.Peer, req ipc.Request, r *ipc.Reply) func() {
 	}
 	r.Send(ipc.Response{
 		Code:  ipc.CodeUnknown,
-		Error: fmt.Sprintf("Служба не знает команды %q: похоже, она старше этой команды vpnlock.", req.Cmd),
+		Error: fmt.Sprintf("Служба не знает команды %q: похоже, она старше этой команды appguard.", req.Cmd),
 	})
 	return nil
 }
@@ -480,7 +480,7 @@ func (s *service) streamNotifications(r *ipc.Reply) {
 }
 
 // syncer — кто вправе прислать итог ежедневного обновления каталога:
-// администратор или владелец клона, из которого поставлен vpnlock (его записала
+// администратор или владелец клона, из которого поставлен appguard (его записала
 // установка). Задача обновления запускает git в клоне, а туда пишут и обычные
 // программы, поэтому на Windows она работает без повышения — и служба пускает
 // её как владельца клона. Сам каталог служба читает из клона сама: прислать
@@ -489,7 +489,7 @@ func (s *service) syncer(peer ipc.Peer) (string, ipc.Response, bool) {
 	data, err := os.ReadFile(s.d.Layout.CloneFile)
 	clone := strings.TrimSpace(string(data))
 	if err != nil || clone == "" {
-		return "", ipc.Response{Code: ipc.CodeFailed, Error: "Неизвестно, из какого клона поставлен vpnlock: переустанови его по setup/README.md."}, false
+		return "", ipc.Response{Code: ipc.CodeFailed, Error: "Неизвестно, из какого клона поставлен appguard: переустанови его по setup/README.md."}, false
 	}
 	// Клона нет — служба запишет это сама, своими словами: тут верить некому.
 	if _, err := os.Stat(clone); errors.Is(err, fs.ErrNotExist) {
@@ -513,10 +513,10 @@ func (s *service) admin(peer ipc.Peer) (ipc.Response, bool) {
 	if err == nil && ok {
 		return ipc.Response{}, true
 	}
-	text := fmt.Sprintf("Менять настройки vpnlock может только администратор этого компьютера, а у пользователя %s таких прав нет.",
+	text := fmt.Sprintf("Менять настройки appguard может только администратор этого компьютера, а у пользователя %s таких прав нет.",
 		s.d.Accounts.Name(peer))
 	if runtime.GOOS == "windows" {
-		text = "Менять настройки vpnlock можно только из PowerShell, открытого от имени администратора: " +
+		text = "Менять настройки appguard можно только из PowerShell, открытого от имени администратора: " +
 			"в меню «Пуск» найди «PowerShell», правой кнопкой — «Запуск от имени администратора», и повтори команду там."
 	}
 	return ipc.Response{Code: ipc.CodeForbidden, Error: text}, false

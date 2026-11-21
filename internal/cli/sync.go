@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
-	"vpnlock/internal/ipc"
+	"appguard/internal/ipc"
 )
 
 // gitTimeout — сколько ждать git: fetch по медленной сети.
 const gitTimeout = 2 * time.Minute
 
-// syncCatalog — `vpnlock catalog sync <клон>`: ежедневная задача от имени
+// syncCatalog — `appguard catalog sync <клон>`: ежедневная задача от имени
 // ученика, без повышения. git fetch и перемотка вперёд в клоне — без слияний,
 // локальные правки не трогаются; затем служба сама берёт из клона каталог и
 // версию инструмента — или узнаёт, почему обновиться не вышло. Защита в любом
@@ -62,7 +62,7 @@ func callWhenUp(env Env, req ipc.Request) (ipc.Response, error) {
 // перематывать нечего); иначе — почему нет, словами для журнала.
 func pull(clone string) string {
 	if fi, err := os.Stat(clone); err != nil || !fi.IsDir() {
-		return "клон " + clone + " не найден — перемещён или удалён; переустанови vpnlock из нового места по setup/README.md"
+		return "клон " + clone + " не найден — перемещён или удалён; переустанови appguard из нового места по setup/README.md"
 	}
 	git, err := gitPath()
 	if err != nil {
@@ -82,7 +82,7 @@ func pull(clone string) string {
 		return strings.TrimSpace(out.String()), err
 	}
 	if _, err := run("rev-parse", "--is-inside-work-tree"); err != nil {
-		return "в " + clone + " больше нет клона git — он перемещён или удалён; переустанови vpnlock из нового места по setup/README.md"
+		return "в " + clone + " больше нет клона git — он перемещён или удалён; переустанови appguard из нового места по setup/README.md"
 	}
 	if out, err := run("fetch", "--quiet"); err != nil {
 		if denied(out) {

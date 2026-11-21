@@ -88,7 +88,7 @@ const (
 	addRetry  = 5 * time.Second
 	hideWait  = 5 * time.Second
 	iconID    = 1
-	className = "vpnlock-tray"
+	className = "appguard-tray"
 )
 
 // perMonitorAwareV2 — DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, то есть -4.
@@ -184,7 +184,7 @@ var shown *notifyIcon
 // wndProc — один на процесс: обратных вызовов windows.NewCallback система не отпускает.
 var wndProc = sync.OnceValue(func() uintptr { return windows.NewCallback(windowProc) })
 
-// notifyIcon — значок. Мьютекс Local\vpnlock-tray держится до выхода процесса: второй
+// notifyIcon — значок. Мьютекс Local\appguard-tray держится до выхода процесса: второй
 // экземпляр запускает schtasks /Run при обновлении, а Local\ действует в пределах
 // сеанса, поэтому у каждого пользователя свой значок.
 type notifyIcon struct {
@@ -202,7 +202,7 @@ type notifyIcon struct {
 
 // System — показ значка в этом сеансе.
 func System() (Icon, error) {
-	name, err := windows.UTF16PtrFromString(`Local\vpnlock-tray`)
+	name, err := windows.UTF16PtrFromString(`Local\appguard-tray`)
 	if err != nil {
 		return nil, err
 	}

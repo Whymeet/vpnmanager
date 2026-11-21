@@ -55,7 +55,7 @@ func Read(path string) (App, error) {
 		}
 	}
 	if Launcher(real) {
-		return App{}, fmt.Errorf("%s запускает другие программы: закрыть её — значит закрыть их все. Защити саму программу или скрипт: vpnlock add /путь/к/скрипту", filepath.Base(path))
+		return App{}, fmt.Errorf("%s запускает другие программы: закрыть её — значит закрыть их все. Защити саму программу или скрипт: appguard add /путь/к/скрипту", filepath.Base(path))
 	}
 	if root := binRoot(real); root != "" {
 		a.ID, a.Path = CommandPrefix+root, root

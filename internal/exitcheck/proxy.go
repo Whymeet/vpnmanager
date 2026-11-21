@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"time"
 
-	"vpnlock/internal/core"
+	"appguard/internal/core"
 )
 
 // viaProxy достаёт страницу через системный прокси p, как её достала бы

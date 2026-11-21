@@ -21,7 +21,7 @@ func TestScriptCompiles(t *testing.T) {
 	}
 	for _, want := range []string{
 		"setActivationPolicy(1)", "setTemplate(true)",
-		"NSStatusItem Preferred Position vpnlock", "autosaveName = $('vpnlock')", // у часов, а не левее всех
+		"NSStatusItem Preferred Position appguard", "autosaveName = $('appguard')", // у часов, а не левее всех
 		"lock.shield.fill", "shield.slash.fill", // открыто и закрыто
 		"$('" + NotifyItem + "')", "NSSwitch", "notify.action = 'toggle:'", "toggle\\n", // переключатель и что он пишет
 		"const width = 220", "preferredMaxLayoutWidth", // меню узкое, длинная причина переносится

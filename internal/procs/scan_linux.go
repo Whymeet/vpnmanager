@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"vpnlock/internal/apps"
+	"appguard/internal/apps"
 )
 
 // System — процессы и сокеты живой системы: всё берётся из /proc, служба работает

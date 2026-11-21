@@ -91,7 +91,7 @@ func (s *trayStand) packageManager(name, uuid string) {
 // run запускает скрипт и возвращает его вывод и что он вызвал.
 func (s *trayStand) run() (out, calls string) {
 	s.t.Helper()
-	cmd := exec.Command("/bin/bash", "../../setup/linux/tray.sh", "/opt/vpnlock/bin/vpnlock")
+	cmd := exec.Command("/bin/bash", "../../setup/linux/tray.sh", "/opt/appguard/bin/appguard")
 	cmd.Env = []string{"PATH=" + s.bin, "HOME=" + s.t.TempDir(), "LOG=" + s.log, "XDG_DATA_DIRS=" + s.data}
 	for k, v := range s.env {
 		cmd.Env = append(cmd.Env, k+"="+v)
@@ -139,9 +139,9 @@ func TestTrayStepSkipsWhenHostExists(t *testing.T) {
 	out, calls := s.run()
 	wantIn(t, out, "рядом с часами")
 	wantNot(t, calls, "apt-get")
-	wantIn(t, calls, "setsid /opt/vpnlock/bin/vpnlock tray")
+	wantIn(t, calls, "setsid /opt/appguard/bin/appguard tray")
 	// Прежний значок (до обновления) снят раньше, чем запущен новый, и только он.
-	if i := strings.Index(calls, "pkill -u 1000 -xf /opt/vpnlock/bin/vpnlock tray"); i < 0 || i > strings.Index(calls, "setsid") {
+	if i := strings.Index(calls, "pkill -u 1000 -xf /opt/appguard/bin/appguard tray"); i < 0 || i > strings.Index(calls, "setsid") {
 		t.Errorf("прежний значок не снят перед запуском нового:\n%s", calls)
 	}
 }
@@ -159,7 +159,7 @@ func TestTrayStepInstallsExtension(t *testing.T) {
 			s.packageManager(tt.manager, tt.uuid)
 			s.program("gnome-extensions", `echo "gnome-extensions $*" >>"$LOG"`)
 			out, calls := s.run()
-			wantIn(t, calls, tt.want, "gnome-extensions enable "+tt.uuid, "setsid /opt/vpnlock/bin/vpnlock tray")
+			wantIn(t, calls, tt.want, "gnome-extensions enable "+tt.uuid, "setsid /opt/appguard/bin/appguard tray")
 			wantIn(t, out, "после следующего входа")
 		})
 	}

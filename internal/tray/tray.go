@@ -17,8 +17,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"vpnlock/internal/core"
-	"vpnlock/internal/ipc"
+	"appguard/internal/core"
+	"appguard/internal/ipc"
 )
 
 // hideAfter — после скольких неудач подряд значок скрывается: один таймаут под
@@ -46,7 +46,7 @@ type View struct {
 
 // Tip — подсказка при наведении.
 func (v View) Tip() string {
-	tip := "vpnlock\n" + v.Title
+	tip := "appguard\n" + v.Title
 	if v.Detail != "" {
 		tip += "\n" + v.Detail
 	}
@@ -58,7 +58,7 @@ func view(p ipc.Protection) View {
 	v := View{Open: p.Open, Notify: !p.NotifyOff}
 	switch {
 	case p.Open && p.IP == "":
-		v.Title = "vpnlock работает" // служба старше значка: защиту не называет
+		v.Title = "appguard работает" // служба старше значка: защиту не называет
 	case p.Open:
 		v.Title, v.Detail = "Приложения в сети", "Выход "+p.IP+", "+core.CountryName(p.Country)
 	case p.Reason != "":
@@ -95,12 +95,12 @@ type Loop struct {
 	State func() (ipc.Protection, error)
 	// SetNotify включает или выключает уведомления: пункт меню.
 	SetNotify func(on bool) error
-	Installed func() bool   // vpnlock ещё установлен
+	Installed func() bool   // appguard ещё установлен
 	Every     time.Duration // как часто спрашивать службу и не чаще чего поднимать показ
 	Logf      func(format string, args ...any)
 }
 
-// Run работает, пока контекст не отменён, vpnlock не удалён или сеанс не кончился.
+// Run работает, пока контекст не отменён, appguard не удалён или сеанс не кончился.
 // На выходе значок скрыт.
 func (l Loop) Run(ctx context.Context) {
 	tick := time.NewTicker(l.Every)

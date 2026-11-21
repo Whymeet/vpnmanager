@@ -9,7 +9,7 @@ import (
 	"slices"
 	"time"
 
-	"vpnlock/internal/core"
+	"appguard/internal/core"
 )
 
 // Сообщения ядра идут пачками: снимок снимается, когда пачка затихла.

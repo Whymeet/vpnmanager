@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"vpnlock/internal/catalog"
-	"vpnlock/internal/ipc"
+	"appguard/internal/catalog"
+	"appguard/internal/ipc"
 )
 
 // defaultCatalog — каталог в клоне, из которого запущена команда.
@@ -20,7 +20,7 @@ const defaultCatalog = catalog.InClone
 // catalogCmd — «catalog load», «catalog export» и «catalog sync».
 func catalogCmd(env Env, args []string) int {
 	if len(args) == 0 || len(args) > 2 {
-		fmt.Fprintln(env.Err, "Нужно: vpnlock catalog load [файл] или vpnlock catalog export [файл]")
+		fmt.Fprintln(env.Err, "Нужно: appguard catalog load [файл] или appguard catalog export [файл]")
 		return 2
 	}
 	if args[0] == "sync" {
@@ -67,15 +67,15 @@ func loadCatalog(env Env, file string) int {
 }
 
 // exportCatalog — у автора: вносит выученное на этом маке в файл каталога
-// клона и показывает, что добавлено и что отброшено. Дальше — обычная
-// публикация курса.
+// клона и показывает, что добавлено и что отброшено. Дальше — обычный
+// коммит.
 func exportCatalog(env Env, file string) int {
 	cur := catalog.Catalog{Format: catalog.Format, Apps: []catalog.App{}}
 	data, err := os.ReadFile(file)
 	switch {
 	case errors.Is(err, fs.ErrNotExist):
 		if _, err := os.Stat(filepath.Dir(file)); err != nil {
-			fmt.Fprintf(env.Err, "Нет каталога %s: запусти команду из клона репозитория vpnlock или укажи файл.\n", filepath.Dir(file))
+			fmt.Fprintf(env.Err, "Нет каталога %s: запусти команду из клона репозитория appguard или укажи файл.\n", filepath.Dir(file))
 			return 1
 		}
 	case err != nil:
@@ -146,7 +146,7 @@ func printReport(env Env, file string, rep catalog.Report) {
 		}
 	}
 	if len(rep.Changes) > 0 {
-		fmt.Fprintf(env.Out, "Дальше — обычная публикация курса: посмотри git diff %s и закоммить.\n", file)
+		fmt.Fprintf(env.Out, "Дальше — посмотри git diff %s и закоммить.\n", file)
 	}
 }
 

@@ -16,7 +16,7 @@ import (
 	"github.com/miekg/dns"
 	"golang.org/x/net/bpf"
 
-	"vpnlock/internal/resolver"
+	"appguard/internal/resolver"
 )
 
 // Answer — ответ DNS: имя, которое спросили, и адреса из ответа (вместе с

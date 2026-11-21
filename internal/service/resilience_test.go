@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/core"
-	"vpnlock/internal/enforce"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/paths"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/core"
+	"appguard/internal/enforce"
+	"appguard/internal/ipc"
+	"appguard/internal/paths"
+	"appguard/internal/service/servicetest"
 )
 
 // Сценарии таски 10: защита держится, что бы ни происходило с самой службой

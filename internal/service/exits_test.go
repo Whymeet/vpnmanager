@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/enforce"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/enforce"
+	"appguard/internal/ipc"
+	"appguard/internal/service/servicetest"
 )
 
 // Сценарии таски 07: правило «только мои выходы» и «Запомнить текущий выход».

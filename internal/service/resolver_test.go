@@ -9,10 +9,10 @@ import (
 
 	"github.com/miekg/dns"
 
-	"vpnlock/internal/enforce"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/resolver"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/enforce"
+	"appguard/internal/ipc"
+	"appguard/internal/resolver"
+	"appguard/internal/service/servicetest"
 )
 
 // Сценарии таски 04: резолвер защищённых доменов. Программа спрашивает

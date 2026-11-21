@@ -2,7 +2,7 @@
 
 // Живая проверка NRPT на стенде Windows — из PowerShell от имени
 // администратора: go test -tags live -v ./internal/sysdns
-// Правило ставится на домен vpnlock-live.test и снимается в конце.
+// Правило ставится на домен appguard-live.test и снимается в конце.
 
 package sysdns
 
@@ -40,14 +40,14 @@ func TestLiveNRPTSendsDomainToService(t *testing.T) {
 			t.Errorf("Clear: %v", err)
 		}
 	})
-	skipped, err := n.Set([]string{"vpnlock-live.test"})
+	skipped, err := n.Set([]string{"appguard-live.test"})
 	if err != nil || len(skipped) > 0 {
 		t.Fatalf("Set: %v, пропущены %v", err, skipped)
 	}
 	time.Sleep(time.Second)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	got, err := net.DefaultResolver.LookupNetIP(ctx, "ip4", "www.vpnlock-live.test")
+	got, err := net.DefaultResolver.LookupNetIP(ctx, "ip4", "www.appguard-live.test")
 	if err != nil || len(got) == 0 || got[0] != answer {
 		t.Fatalf("имя ушло мимо службы: %v %v", got, err)
 	}

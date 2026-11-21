@@ -6,8 +6,8 @@ import (
 	"slices"
 	"strings"
 
-	"vpnlock/internal/core"
-	"vpnlock/internal/resolver"
+	"appguard/internal/core"
+	"appguard/internal/resolver"
 )
 
 // forget убирает у приложения id выученные адреса и домены из items: человек
@@ -32,7 +32,7 @@ func (e *engine) forget(id string, items []string) (forgot, warnings []string, e
 				addrs = slices.Delete(addrs, i, i+1)
 				forgot = append(forgot, s)
 			} else if d := e.domainWith(id, s); d != "" {
-				warnings = append(warnings, fmt.Sprintf("%s — адрес домена %s, его закрывает домен: vpnlock forget %s %s", s, d, name, d))
+				warnings = append(warnings, fmt.Sprintf("%s — адрес домена %s, его закрывает домен: appguard forget %s %s", s, d, name, d))
 			} else {
 				warnings = append(warnings, fmt.Sprintf("%s у %s не выучен", s, name))
 			}
@@ -49,7 +49,7 @@ func (e *engine) forget(id string, items []string) (forgot, warnings []string, e
 			warnings = append(warnings, fmt.Sprintf("%q — не адрес и не домен", item))
 		default:
 			if parent := e.parentOf(id, domain); parent != "" {
-				warnings = append(warnings, fmt.Sprintf("%s входит в домен %s — забудь его: vpnlock forget %s %s", domain, parent, name, parent))
+				warnings = append(warnings, fmt.Sprintf("%s входит в домен %s — забудь его: appguard forget %s %s", domain, parent, name, parent))
 			} else {
 				warnings = append(warnings, fmt.Sprintf("домена %s у %s нет", domain, name))
 			}

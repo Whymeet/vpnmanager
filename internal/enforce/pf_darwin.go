@@ -13,10 +13,10 @@ import (
 	"strings"
 	"sync"
 
-	"vpnlock/internal/core"
+	"appguard/internal/core"
 )
 
-// Anchor — якорь pf с правилами vpnlock. Он вложен в com.apple: основной конфиг
+// Anchor — якорь pf с правилами appguard. Он вложен в com.apple: основной конфиг
 // macOS (/etc/pf.conf) уже вызывает `anchor "com.apple/*"`, поэтому правила
 // действуют без правки системного конфига. Основной набор правил мы не
 // перезагружаем никогда: так пропали бы якоря, которые система вставляет на лету
@@ -24,19 +24,19 @@ import (
 // перезагружает чужая программа, вложенные якоря остаются на месте. Номер 100
 // ставит нас раньше якорей Apple (200.AirDrop, 250.ApplicationFirewall): вложенные
 // якоря идут по алфавиту.
-const Anchor = "com.apple/100.vpnlock"
+const Anchor = "com.apple/100.appguard"
 
 // tables — имена таблиц внутри якоря (они видны только ему).
 const (
-	table4 = "vpnlock4"
-	table6 = "vpnlock6"
+	table4 = "appguard4"
+	table6 = "appguard6"
 )
 
 const pfctl = "/sbin/pfctl"
 
 // PF — исполнитель на встроенном файрволе pf. Требует root.
 type PF struct {
-	// TokenFile — где хранится токен, с которым vpnlock включил pf (`pfctl -E`).
+	// TokenFile — где хранится токен, с которым appguard включил pf (`pfctl -E`).
 	// Пока токен не возвращён, pf остаётся включённым, даже если его ссылку
 	// отпустит кто-то другой. Удаление возвращает токен.
 	TokenFile string
@@ -163,7 +163,7 @@ func enabled() (bool, error) {
 }
 
 // mainConf — основной конфиг pf системы. В нём точка `anchor "com.apple/*"`,
-// через которую действует якорь vpnlock.
+// через которую действует якорь appguard.
 const mainConf = "/etc/pf.conf"
 
 var hookRule = []byte(`anchor "com.apple/*"`)
@@ -178,7 +178,7 @@ func mainRules() ([]byte, error) {
 }
 
 // hook проверяет, что основной набор правил вызывает якоря com.apple: без этого
-// правила vpnlock не действуют. Основной набор мы не перезагружаем: в нём
+// правила appguard не действуют. Основной набор мы не перезагружаем: в нём
 // бывают якоря, которые системные службы вставляют на лету. Исключение —
 // пустой набор фильтров (его сбросили, вставленного на лету там уже нет): его
 // фильтры возвращаются из /etc/pf.conf, правила NAT не трогаются (-R).
@@ -195,7 +195,7 @@ func hook() error {
 			return err
 		}
 	}
-	return errors.New(`основной набор правил pf не вызывает якоря com.apple (anchor "com.apple/*"): его заменила другая программа или изменён /etc/pf.conf — правила vpnlock не действуют`)
+	return errors.New(`основной набор правил pf не вызывает якоря com.apple (anchor "com.apple/*"): его заменила другая программа или изменён /etc/pf.conf — правила appguard не действуют`)
 }
 
 // Verify сверяет файрвол с правилами r, ничего не меняя: pf включён, основной

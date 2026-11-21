@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/config"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/paths"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/config"
+	"appguard/internal/ipc"
+	"appguard/internal/paths"
+	"appguard/internal/service/servicetest"
 )
 
 // Сценарии таски 13 на шве: итог ежедневного обновления приходит от задачи,
@@ -41,7 +41,7 @@ func TestStaleCatalogIsReminded(t *testing.T) {
 }
 
 // cloneWith — клон с каталогом data и версией инструмента, из которого
-// «поставлен» vpnlock в каталоге root.
+// «поставлен» appguard в каталоге root.
 func cloneWith(t *testing.T, root, data string) string {
 	t.Helper()
 	clone := t.TempDir()

@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/cli"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/cli"
+	"appguard/internal/ipc"
+	"appguard/internal/service/servicetest"
 )
 
 // Агент уведомлений (на Windows его запускает задача при входе) показывает
-// то, что раздаёт служба, и выходит сам, когда vpnlock больше не установлен.
+// то, что раздаёт служба, и выходит сам, когда appguard больше не установлен.
 func TestNotifyAgentShowsNotesAndLeavesWithTheTool(t *testing.T) {
 	s := servicetest.Start(t, "", servicetest.Fakes{Accounts: &servicetest.Accounts{Admin: true}})
 	var mu sync.Mutex
@@ -25,7 +25,7 @@ func TestNotifyAgentShowsNotesAndLeavesWithTheTool(t *testing.T) {
 		return nil
 	}}
 	done := make(chan run, 1)
-	go func() { done <- vpnlock(env, "", "notify-agent") }()
+	go func() { done <- appguard(env, "", "notify-agent") }()
 	time.Sleep(200 * time.Millisecond) // агент подписался
 
 	s.Web.Set("185.1.2.3", "DE", "DE")
@@ -46,7 +46,7 @@ func TestNotifyAgentShowsNotesAndLeavesWithTheTool(t *testing.T) {
 		time.Sleep(10 * time.Millisecond)
 	}
 
-	// vpnlock удалён: файлов установки нет, служба ушла — агенту больше нечего
+	// appguard удалён: файлов установки нет, служба ушла — агенту больше нечего
 	// делать.
 	os.RemoveAll(s.Layout.AppDir)
 	s.Stop()
@@ -61,7 +61,7 @@ func TestNotifyAgentShowsNotesAndLeavesWithTheTool(t *testing.T) {
 }
 
 func TestNotifyAgentIsForWindowsOnly(t *testing.T) {
-	if r := vpnlock(cli.Env{Layout: emptyLayout(t)}, "", "notify-agent"); r.code != 2 {
+	if r := appguard(cli.Env{Layout: emptyLayout(t)}, "", "notify-agent"); r.code != 2 {
 		t.Fatalf("%+v", r)
 	}
 }

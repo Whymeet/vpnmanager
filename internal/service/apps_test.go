@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/enforce"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/enforce"
+	"appguard/internal/ipc"
+	"appguard/internal/service/servicetest"
 )
 
 // Сценарии таски 05: приложения и обучение. Сокеты процессов приложения

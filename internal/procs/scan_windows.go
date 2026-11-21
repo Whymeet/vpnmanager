@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"vpnlock/internal/apps"
+	"appguard/internal/apps"
 )
 
 // Scan находит процессы приложений — программы папки установки, сам exe или

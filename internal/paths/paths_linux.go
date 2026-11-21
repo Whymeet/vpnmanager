@@ -3,12 +3,12 @@ package paths
 
 import "path/filepath"
 
-// Unit — служба vpnlock в systemd. CatalogTimer и CatalogService — ежедневное
+// Unit — служба appguard в systemd. CatalogTimer и CatalogService — ежедневное
 // обновление каталога: системный таймер и задача от имени того, кто ставил.
 const (
-	Unit           = "vpnlock.service"
-	CatalogTimer   = "vpnlock-catalog.timer"
-	CatalogService = "vpnlock-catalog.service"
+	Unit           = "appguard.service"
+	CatalogTimer   = "appguard-catalog.timer"
+	CatalogService = "appguard-catalog.service"
 )
 
 // Layout — пути установки. Все они вне репозитория: настройки принадлежат
@@ -28,11 +28,11 @@ type Layout struct {
 	TrayStart   string // автозапуск значка: один файл на всех пользователей и все рабочие столы
 	LogDir      string
 	LogFile     string // вывод службы: старт, остановка, ошибки
-	CommandLink string // команда vpnlock в PATH пользователя
-	CloneFile   string // из какого клона поставлен vpnlock: оттуда его обновляет `vpnlock update`
+	CommandLink string // команда appguard в PATH пользователя
+	CloneFile   string // из какого клона поставлен appguard: оттуда его обновляет `appguard update`
 }
 
-// Traces — что остаётся на диске от установки: есть хоть одно — vpnlock
+// Traces — что остаётся на диске от установки: есть хоть одно — appguard
 // установлен.
 func (L Layout) Traces() []string { return []string{L.UnitFile, L.AppDir} }
 
@@ -43,25 +43,35 @@ func System() Layout { return Under("/") }
 // установку во временной папке.
 func Under(root string) Layout {
 	at := func(elem ...string) string { return filepath.Join(append([]string{root}, elem...)...) }
-	app := at("opt", "vpnlock")
+	app := at("opt", "appguard")
 	state := filepath.Join(app, "state")
-	logs := at("var", "log", "vpnlock")
+	logs := at("var", "log", "appguard")
 	units := at("etc", "systemd", "system")
 	return Layout{
 		AppDir:      app,
-		Binary:      filepath.Join(app, "bin", "vpnlock"),
+		Binary:      filepath.Join(app, "bin", "appguard"),
 		StateDir:    state,
 		ConfigFile:  filepath.Join(state, "config.json"),
 		LockFile:    filepath.Join(state, "daemon.lock"),
-		Socket:      at("run", "vpnlock.sock"),
+		Socket:      at("run", "appguard.sock"),
 		UnitFile:    filepath.Join(units, Unit),
 		TimerFile:   filepath.Join(units, CatalogTimer),
 		TaskFile:    filepath.Join(units, CatalogService),
 		ClosedRules: filepath.Join(state, "closed.nft"),
-		TrayStart:   at("etc", "xdg", "autostart", "vpnlock-tray.desktop"),
+		TrayStart:   at("etc", "xdg", "autostart", "appguard-tray.desktop"),
 		LogDir:      logs,
 		LogFile:     filepath.Join(logs, "daemon.log"),
-		CommandLink: at("usr", "local", "bin", "vpnlock"),
+		CommandLink: at("usr", "local", "bin", "appguard"),
 		CloneFile:   filepath.Join(app, "clone"),
 	}
+}
+
+// LegacySystem и LegacyUnder — где лежит установка под прежним именем vpnlock
+// (до 0.23.0): её бинарник и настройки. Установка appguard забирает настройки и
+// снимает её этим бинарником.
+func LegacySystem() (binary, state string) { return LegacyUnder("/") }
+
+func LegacyUnder(root string) (binary, state string) {
+	app := filepath.Join(root, "opt", "vpnlock")
+	return filepath.Join(app, "bin", "vpnlock"), filepath.Join(app, "state")
 }

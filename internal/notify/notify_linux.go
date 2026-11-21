@@ -15,7 +15,7 @@ import (
 )
 
 // Title — заголовок уведомлений.
-const Title = "vpnlock"
+const Title = "appguard"
 
 // timeout — сколько ждать показа: журнал от уведомления не зависит.
 const timeout = 10 * time.Second

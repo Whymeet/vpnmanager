@@ -1,28 +1,33 @@
 # CLAUDE.md
 
-vpnlock — служба для macOS и Windows: защищённые приложения выходят в сеть только
+appguard — служба для macOS и Windows: защищённые приложения выходят в сеть только
 через VPN, выход которого инструмент проверил сам. Это рабочий репозиторий автора;
-ученикам уезжает копия через станок раздачи курса.
+открытая копия https://github.com/XoDefender/appguard собирается из него станком
+раздачи — без спек и личного.
 
-- Спека и таски — `_specs/vpnlock/`, работа идёт по ним: `/implement vpnlock`.
+- Спека и таски — `_specs/appguard/`, работа идёт по ним: `/implement appguard`.
+- До 0.23.0 инструмент назывался vpnlock. Установка appguard находит прежнюю
+  (`paths.LegacySystem`), забирает её настройки и снимает её её же бинарником
+  `uninstall --yes` (`install/legacy.go`); переход для людей — «Был vpnlock» в
+  `setup/README.md`.
 - Установку для ученика описывает `setup/README.md`, его читает агент ученика.
   Меняешь установку — правь и его.
 
 ## Сборка и тесты
 
 - Go ставит `setup/macos/prepare.sh` в `.toolchain/` клона (в git не попадает),
-  он же собирает `bin/vpnlock`.
+  он же собирает `bin/appguard`.
 - Установка — одна команда человека: `install.cmd` в корне — один файл на обе
   системы (первая строка `:; exec …` — для sh пустая команда и переход в
   `setup/macos/install.sh`, для cmd.exe — метка; дальше cmd.exe запускает
   `install.ps1` с `-ExecutionPolicy Bypass` и при двойном щелчке ждёт клавишу).
   Переводы строк в нём — только LF. `setup/macos/install.sh` без sudo (шаги
-  `[1/5]`: подготовка `prepare.sh --install` от его имени, затем `sudo bin/vpnlock
+  `[1/5]`: подготовка `prepare.sh --install` от его имени, затем `sudo bin/appguard
   install` и статус; без терминала — отказ, через sudo — возвращается к
   `SUDO_USER`). На Windows `install.ps1` из обычного окна: подготовка
   `-ForInstall`, установка в окне UAC (`-Elevated`), её вывод — через файл
   `-Log`. `prepare` без ключа — для агента, с `--update`/`-ForUpdate` — для
-  `vpnlock update`.
+  `appguard update`.
 - Разработка — через `tools/go`: тот же тулчейн и то же окружение
   (`tools/go test ./...`, `tools/go vet ./...`).
 - Зависимости лежат в `vendor/`, чтобы сборка у ученика не ходила в сеть. После
@@ -40,9 +45,9 @@ vpnlock — служба для macOS и Windows: защищённые прил�
 
 ## Устройство
 
-- Один исполняемый файл: `vpnlock daemon` — служба (root, launchd), всё остальное —
+- Один исполняемый файл: `appguard daemon` — служба (root, launchd), всё остальное —
   клиент (`internal/cli`). Команды и их аргументы — по-английски (`status`, `add`, `rule mine`…), меню и сообщения — по-русски.
-- Клиент ↔ служба — unix-сокет `/var/run/vpnlock.sock` (`internal/ipc`): строка
+- Клиент ↔ служба — unix-сокет `/var/run/appguard.sock` (`internal/ipc`): строка
   JSON туда, строка обратно (журнал — поток строк). Подключиться может любой
   пользователь; менять настройки — root или группа admin, uid служба узнаёт у ядра
   (`LOCAL_PEERCRED`). Исключение — уведомления (`CmdNotify`): их выключает и
@@ -69,8 +74,8 @@ vpnlock — служба для macOS и Windows: защищённые прил�
   на петлю.
 - `internal/journal` — журнал по файлу на день в каталоге службы, 7 дней.
 - Ежедневное обновление каталога: установка ставит тому, кто вызвал sudo,
-  LaunchAgent `com.vpnlock.catalog` (`~/Library/LaunchAgents`, раз в сутки и при
-  входе) — `vpnlock catalog sync <клон>`: `git fetch` + `merge --ff-only @{u}` и
+  LaunchAgent `com.appguard.catalog` (`~/Library/LaunchAgents`, раз в сутки и при
+  входе) — `appguard catalog sync <клон>`: `git fetch` + `merge --ff-only @{u}` и
   `ipc.CmdSync` (удалось или причина неудачи). Итог принимается от
   администратора или владельца клона, который записала установка
   (`AppDir/clone`); каталог и версию служба читает из этого клона сама, по
@@ -79,15 +84,15 @@ vpnlock — служба для macOS и Windows: защищённые прил�
   когда каталог сверялся (`catalogChecked`), и напоминает через 7 дней. Задача
   стоит и у автора — перематывает вперёд его рабочий клон, если тот чист и
   отстал. Снимает её удаление (`catalog-agent.json` в каталоге установки).
-- «Обновить» (`vpnlock update [клон]`) запускает человек, как установку:
+- «Обновить» (`appguard update [клон]`) запускает человек, как установку:
   `sudo` на macOS, PowerShell от имени администратора на Windows. Клон — из
   аргумента, текущей папки или `AppDir/clone` (его пишет установка). Сборка —
   подготовкой с `--update`/`-ForUpdate` от имени человека (на macOS root
   сбрасывает права до `SUDO_USER`: сборка под root испортила бы кэш в
-  `.toolchain`), затем `<клон>/bin/vpnlock install`. Через службу обновление не
+  `.toolchain`), затем `<клон>/bin/appguard install`. Через службу обновление не
   идёт сознательно: иначе любой процесс администратора без пароля заставил бы
   службу root запустить свой файл.
-- «Проверка» (`vpnlock check`, `ipc.CmdCheck`): служба — правила (`Verify`),
+- «Проверка» (`appguard check`, `ipc.CmdCheck`): служба — правила (`Verify`),
   выход, «Россия напрямую», каждый защищённый сервис мимо VPN (до трёх адресов,
   `exitcheck.Reach` через физический интерфейс, 2 с; серверы VPN через CDN не
   пробуются); клиент — «безопасный DNS» браузеров из профиля человека
@@ -101,34 +106,34 @@ vpnlock — служба для macOS и Windows: защищённые прил�
   повторяется, смена выхода при открытых сервисах — новое событие. О закрытии —
   только если оно длится дольше `Deps.NotifyAfter` (15 с; дождавшееся отдаёт тик
   `notifyDue`): переподключение VPN проходит молча, и открытие после него тем же
-  выходом тоже. Выключаются настройкой `notifyOff` (`vpnlock notifications off`
+  выходом тоже. Выключаются настройкой `notifyOff` (`appguard notifications off`
   или меню значка — `CmdNotify` принимается от любого пользователя), журнал
   пишется всегда.
 - `internal/tray` — значок службы рядом с часами: есть значок — служба отвечает;
   картинка — защита (щит с замком — в сети, перечёркнутый — без сети); по щелчку
   узкое меню — заголовок, строка под ним (выход или причина), «Уведомления»
-  (переключатель на macOS, отметка на Windows и Linux). `vpnlock tray` — служебная
+  (переключатель на macOS, отметка на Windows и Linux). `appguard tray` — служебная
   команда, как `notify-agent`: цикл (`tray.Loop`) раз в 2 с спрашивает
   `CmdProtection` (`ipc.Protection` — части: адрес, страна, причина), новый ответ —
   `Icon.Update`; пункт меню — `CmdNotify` и `Update` даже с тем же видом. Три неудачи
-  подряд скрывают значок, после удаления vpnlock значок выходит сам, занятое место
+  подряд скрывают значок, после удаления appguard значок выходит сам, занятое место
   новый экземпляр ждёт до 5 с (обновление снимает старый). Перечёркнутый щит для
   Windows и Linux строится из `shield.png` в коде. Показ — шов `Icon`: на macOS
   дочерний `osascript` (`app.run`; меню 220 pt из своих видов с `NSSwitch`; вид —
   строки JSON из ASCII в stdin, переключатель — `toggle` в stdout, конец stdin —
-  выход; LaunchAgent `com.vpnlock.tray` без
+  выход; LaunchAgent `com.appguard.tray` без
   `AbandonProcessGroup`: launchd снимает группу процессов; путь — из `Agent.Home`,
   формат `catalog-agent.json` не менялся; новый значок macOS ставит левее всех,
   поэтому при первом запуске ему задаётся `NSStatusItem Preferred Position` 0 — у
   часов), на Windows `Shell_NotifyIconW` на закреплённом потоке (задача
-  `vpnlock-tray`, установка делает `/End` перед `/Run`, мьютекс `Local\vpnlock-tray`,
+  `appguard-tray`, установка делает `/End` перед `/Run`, мьютекс `Local\appguard-tray`,
   `TaskbarCreated`, окно обычное, не `HWND_MESSAGE`, меню — `TrackPopupMenu`), на
   Linux StatusNotifierItem с dbusmenu (`_docs/linux.md`).
 - Зонд «Россия напрямую» (`exitcheck.Probe`): Яндекс (ipv4-internet.yandex.net,
   запасной yandex.ru/internet) спрашивается через туннель и через физический
   интерфейс; одинаковый ответ — клиент VPN шлёт российское мимо туннеля. Зонд
   только сообщает: прямые соединения к узлам сервисов в России и так закрывает pf.
-- `internal/enforce` — исполнитель на pf: якорь `com.apple/100.vpnlock` (его уже
+- `internal/enforce` — исполнитель на pf: якорь `com.apple/100.appguard` (его уже
   вызывает `anchor "com.apple/*"` из /etc/pf.conf). Таблицы адресов защищённых
   сервисов закрыты везде, кроме проверенных туннелей. **Основной набор pf не
   перезагружать**: пропадут якоря, которые система вставляет на лету (общий
@@ -152,7 +157,7 @@ vpnlock — служба для macOS и Windows: защищённые прил�
   ходят все.
   Совпавший с защищённым адресом (VPN через CDN) разрешён на физическом
   интерфейсе. Клиенты на WireGuard (AmneziaVPN) шлют через неподключённый UDP —
-  их сервер в lsof не виден. `sudo vpnlock uninstall` (`Installer.Uninstall`)
+  их сервер в lsof не виден. `sudo appguard uninstall` (`Installer.Uninstall`)
   снимает plist, останавливает службу, затем pf и резолверы (`Installer.Clear`
   — иначе сторож вернул бы правила, а токен pf лежит в каталоге службы) и
   только потом файлы; служба не остановилась — правила и файлы остаются.
@@ -161,7 +166,7 @@ vpnlock — служба для macOS и Windows: защищённые прил�
   затем Google, по IP); российский DNS (Яндекс) спрашивается через физический
   интерфейс с ECS /0, его адреса только в таблицы. Ответ уходит после того, как
   адреса легли в pf; не легли — SERVFAIL. `internal/sysdns` — файлы
-  `/etc/resolver/<домен>` с пометкой `# vpnlock`, чужие не трогаются.
+  `/etc/resolver/<домен>` с пометкой `# appguard`, чужие не трогаются.
 - Приложения: `internal/apps` — пакеты .app в папках «Программы» (Info.plist
   через howett.net/plist); `internal/procs` — процессы приложения (`ps`) и их
   соединения (`lsof`), включая вспомогательные и обновлятор (ShipIt/Sparkle в
@@ -169,7 +174,7 @@ vpnlock — служба для macOS и Windows: защищённые прил�
   обучение. Служебные адреса (DoH, проверка выхода, российский DNS) не учатся
   никогда — их список сверяет тест `learn` с `exitcheck` и `resolver`.
   Обучено — после `LearnFor` работы при проверенном выходе и хотя бы одного адреса.
-- Консольные программы на macOS (`vpnlock add claude` или путь): `apps.Read` не
+- Консольные программы на macOS (`appguard add claude` или путь): `apps.Read` не
   для .app — `readCommand`; что защищается — `apps.CommandTarget` (папка
   установки: `versions/` у Claude Code, формула в Cellar без папки версии, пакет
   в `node_modules`; в общих папках — сам файл), идентификатор `cmd:<цель>`.
@@ -198,13 +203,13 @@ vpnlock — служба для macOS и Windows: защищённые прил�
 - Пропуск TCP в pf — с `flags any`: адрес часто попадает в таблицу посреди уже
   открытого соединения, и без этого pf рвал бы его.
 - Ручная защита — без приложения: `protect`/`unprotect` по домену или адресу,
-  `vpnlock import <файл>` — сразу всё из файла (выгрузка `catalog export` или
+  `appguard import <файл>` — сразу всё из файла (выгрузка `catalog export` или
   список доменов, адресов и ссылок, `catalog.ParseList`; CLI шлёт пачками по
   500: запрос к службе не больше 64 КБ). Домены — `Protected.Manual`, адреса —
   `Settings.Addrs` (`engine.manual`); что закрывать нельзя, отбрасывается
   (`learn.Acceptable`, `learn.Domain`). Статус показывает строку «Вручную».
-- Конфиг курса — `configs/macos.conf`, `linux.conf`, `windows.conf` в клоне;
-  применяет `vpnlock apply [файл]` (`cli/apply.go`): без файла — конфиг своей
+- Готовый конфиг — `configs/macos.conf`, `linux.conf`, `windows.conf` в клоне;
+  применяет `appguard apply [файл]` (`cli/apply.go`): без файла — конфиг своей
   системы (`runtime.GOOS`) из клона (`findClone`, как у `update`). Строки — те же
   команды CLI (`app` → add, `exit` → remember, `rule`, `protect`, `import`,
   `notifications`); файл проверяется целиком до изменений, первая неудача
@@ -226,9 +231,9 @@ vpnlock — служба для macOS и Windows: защищённые прил�
   точное имя прежде регистра (`Claude` и `claude` — разные).
 -  Каталог: `catalog/catalog.json` в клоне (`internal/catalog`, формат с номером
   версии; новее поддерживаемого — не применяется). Установка кладёт его службе;
-  `vpnlock catalog load` — то же без переустановки. Приложение из каталога
+  `appguard catalog load` — то же без переустановки. Приложение из каталога
   защищено сразу, его домены принадлежат ему (`Protected.Apps`), ручные —
-  `Manual`. `vpnlock catalog export` у автора сливает выученное в файл клона:
+  `Manual`. `appguard catalog export` у автора сливает выученное в файл клона:
   свои домены сервиса — до зарегистрированных (свои — уже свёрнутые в записи
   каталога, из идентификатора пакета `com.openai.chat` → `openai.com` и с именем
   приложения), сторонние (аналитика, отчёты об ошибках) — точным именем; имена
@@ -238,24 +243,24 @@ vpnlock — служба для macOS и Windows: защищённые прил�
 - `internal/tui` — меню стрелками (termios, без зависимостей). Ввод команды —
   один `bufio.Reader` на всё (`cli.Run`): иначе ответ «да» после выбора терялся.
 - Живой тест pf требует root: собрать `tools/go test -c -tags live -o
-  /tmp/vpnlock-enforce.test ./internal/enforce`, запускает автор под sudo
+  /tmp/appguard-enforce.test ./internal/enforce`, запускает автор под sudo
   (сборка под sudo испортит кэш в `.toolchain`). То же — BPF:
-  `./internal/dnswatch` → `/tmp/vpnlock-dnswatch.test`.
+  `./internal/dnswatch` → `/tmp/appguard-dnswatch.test`.
 - Пути установки — `internal/paths`, все вне репозитория.
 - Шов тестов — служба целиком с подменёнными адаптерами ОС
   (`internal/service/servicetest`). Сценарии из спеки пишутся на нём.
-- **Windows.** `vpnlock daemon` — служба Windows (`svc.Run`, LocalSystem,
-  автозапуск, перезапуск по правилам восстановления; остановку не от vpnlock
+- **Windows.** `appguard daemon` — служба Windows (`svc.Run`, LocalSystem,
+  автозапуск, перезапуск по правилам восстановления; остановку не от appguard
   служба завершает с ошибкой, чтобы они сработали, — обновление и удаление
   заранее шлют ей свою команду `paths.PlannedStop`), вывод — в
-  `ProgramData\vpnlock\logs\daemon.log`. Программа — `Program Files\vpnlock`
-  (папка `bin` дописана в системный PATH), данные — `ProgramData\vpnlock` с
+  `ProgramData\appguard\logs\daemon.log`. Программа — `Program Files\appguard`
+  (папка `bin` дописана в системный PATH), данные — `ProgramData\appguard` с
   защищённым ACL (state — только SYSTEM и администраторы). Канал — два
-  именованных канала, `\\.\pipe\vpnlock` (всем) и `…-admin` (SYSTEM и
+  именованных канала, `\\.\pipe\appguard` (всем) и `…-admin` (SYSTEM и
   администраторы): «менять — только из PowerShell от имени администратора»
   проверяет ядро по ACL, служба лишь смотрит, через какой канал пришёл клиент
   (`ipc.Peer.Admin`). Клиент верит каналу, только если его владелец — SYSTEM или
-  администраторы (имя канала может занять кто угодно). Удаляет `vpnlock
+  администраторы (имя канала может занять кто угодно). Удаляет `appguard
   uninstall` на месте, от имени администратора: служба свой exe снять не может, а
   работающий exe клиента уезжает в `Windows\Temp` до перезагрузки.
 - **WFP** (`enforce/wfp_windows.go`, привязки к fwpuclnt.dll —
@@ -267,7 +272,7 @@ vpnlock — служба для macOS и Windows: защищённые прил�
   вывод службы); разрешение «приложение с адреса проверенного туннеля» — в
   динамической сессии: служба умерла — Windows сама его сняла. Петля разрешена.
   Идентификаторы фильтров — хэш смысла (`ruleID`), какие приложения под
-  фильтрами — `state/wfp.json`; по ним снимает `vpnlock uninstall`
+  фильтрами — `state/wfp.json`; по ним снимает `appguard uninstall`
   (`Installer.Clear` — после остановки службы, до удаления файлов). Раскладка
   структур WFP сверяется при сборке; живьём — `TestLiveWFP…` на стенде.
 -  **Приложения на Windows.** Список — ярлыки «Пуска» (`apps/lnk.go`, разбор
@@ -300,23 +305,23 @@ vpnlock — служба для macOS и Windows: защищённые прил�
   Резолвер — `127.53.53.53:53`: NRPT порта не знает, а на `127.0.0.1:53` часто
   DNS клиента VPN. Правила NRPT (`sysdns/sysdns_windows.go`) — в реестре
   `…\Dnscache\Parameters\DnsPolicyConfig`, по 50 доменов с ведущей точкой,
-  метка `Comment = vpnlock`; если правила задаёт групповая политика, локальные
+  метка `Comment = appguard`; если правила задаёт групповая политика, локальные
   Windows не читает — служба пишет об этом в журнал.
 - **Уведомления на Windows**: у службы нет сеанса, поэтому она раздаёт их по
   каналу (`ipc.CmdNotifications`, подписчики — `service/hub.go`), а
-  показывает агент `vpnlock notify-agent` в сеансе пользователя. Его запускает
-  задача планировщика `vpnlock-notify` (группа «Пользователи», при входе) из
-  `vpnlockw.exe` — той же программы, собранной с `-H=windowsgui`, чтобы
+  показывает агент `appguard notify-agent` в сеансе пользователя. Его запускает
+  задача планировщика `appguard-notify` (группа «Пользователи», при входе) из
+  `appguardw.exe` — той же программы, собранной с `-H=windowsgui`, чтобы
   при входе не мигало окно. Показ — PowerShell с WinRT-уведомлением, текст —
-  переменной окружения. Агент выходит сам, когда vpnlock удалён. Работающие
+  переменной окружения. Агент выходит сам, когда appguard удалён. Работающие
   exe при обновлении и удалении уезжают в `Windows\Temp` (`moveAside`).
 - **Каталог на Windows**: приложение находится в каталоге по имени exe, которым
   его добавили (`config.App.Exe`, `catalog.ForWindows`), или по семейству
   пакета Store — так у него без обучения есть домены и адреса. Ежедневное
-  обновление — задача `vpnlock-catalog` от имени того, кто ставил vpnlock,
+  обновление — задача `appguard-catalog` от имени того, кто ставил appguard,
   **без повышения** (хук git в клоне, куда пишут обычные программы, с
   наивысшими правами получил бы права администратора без UAC; итог служба
-  принимает от владельца клона), из `vpnlockw.exe`; git — из PATH, без окон
+  принимает от владельца клона), из `appguardw.exe`; git — из PATH, без окон
   (`CREATE_NO_WINDOW`,
   `GCM_INTERACTIVE=never`). «Безопасный DNS» браузеров — те же настройки в
   `AppData` (`browsers.check` знает обе раскладки).
@@ -331,7 +336,7 @@ vpnlock — служба для macOS и Windows: защищённые прил�
 - Git для Windows кладёт клон с CRLF (`core.autocrlf`): что читается из клона,
   сверяется без `\r` (`install.IsClone`).
 - `script` на macOS теряет ввод из трубы — диалог с подтверждением проверяется
-  через `expect` (`spawn vpnlock uninstall`, ответ `send "да\r"`).
+  через `expect` (`spawn appguard uninstall`, ответ `send "да\r"`).
 - Путь unix-сокета не длиннее 104 байт, а временные каталоги тестов на macOS
   длиннее — в тестах сокет лежит в `/tmp` (`servicetest.Socket`).
 - `launchctl bootstrap` сразу после `bootout` иногда отвечает «5: Input/output

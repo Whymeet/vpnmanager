@@ -11,8 +11,8 @@ import (
 	"net"
 	"time"
 
-	"vpnlock/internal/catalog"
-	"vpnlock/internal/core"
+	"appguard/internal/catalog"
+	"appguard/internal/core"
 )
 
 // Команды службы.

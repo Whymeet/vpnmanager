@@ -4,21 +4,21 @@ import (
 	"fmt"
 	"os"
 
-	"vpnlock/internal/catalog"
-	"vpnlock/internal/core"
-	"vpnlock/internal/ipc"
+	"appguard/internal/catalog"
+	"appguard/internal/core"
+	"appguard/internal/ipc"
 )
 
 // importBatch — сколько доменов и адресов идёт службе одним запросом: запрос
 // не больше 64 КБ.
 const importBatch = 500
 
-// importFile — `vpnlock import <файл>`: всё из файла закрывается сразу, вне
-// проверенного VPN, как через protect. Файл — выгрузка vpnlock catalog export
+// importFile — `appguard import <файл>`: всё из файла закрывается сразу, вне
+// проверенного VPN, как через protect. Файл — выгрузка appguard catalog export
 // с другого компьютера или список доменов и адресов.
 func importFile(env Env, args []string) int {
 	if len(args) != 1 {
-		fmt.Fprintln(env.Err, "Укажи файл: vpnlock import <файл> — выгрузка vpnlock catalog export или список доменов и адресов, по одному на строку.")
+		fmt.Fprintln(env.Err, "Укажи файл: appguard import <файл> — выгрузка appguard catalog export или список доменов и адресов, по одному на строку.")
 		return 2
 	}
 	data, err := os.ReadFile(args[0])

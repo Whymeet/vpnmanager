@@ -26,9 +26,9 @@ func TestTunnelIfaceBySysfs(t *testing.T) {
 	dev("tap0", map[string]string{"type": "1\n", "tun_flags": "0x1002\n"})
 	dev("ppp0", map[string]string{"type": "512\n"})
 	dev("vnet3", map[string]string{"type": "1\n", "tun_flags": "0x1002\n", "brport": ""})
-	dev("vpnlock0", map[string]string{"type": "1\n"})
+	dev("appguard0", map[string]string{"type": "1\n"})
 	for name, want := range map[string]bool{"eth0": false, "wg0": true, "nordlynx": true, "tun0": true, "tap0": true,
-		"ppp0": true, "vnet3": false, "vpnlock0": false, "gone0": false} {
+		"ppp0": true, "vnet3": false, "appguard0": false, "gone0": false} {
 		if got := tunnelIface(sys, name); got != want {
 			t.Errorf("tunnelIface(%s) = %v, а нужно %v", name, got, want)
 		}

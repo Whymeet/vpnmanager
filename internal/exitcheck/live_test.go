@@ -15,8 +15,8 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/core"
-	"vpnlock/internal/netwatch"
+	"appguard/internal/core"
+	"appguard/internal/netwatch"
 )
 
 // Проверка через каждый туннель, который сейчас есть.

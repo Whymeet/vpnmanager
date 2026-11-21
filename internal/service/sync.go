@@ -12,10 +12,10 @@ import (
 	"time"
 	"unicode"
 
-	"vpnlock/internal/catalog"
-	"vpnlock/internal/config"
-	"vpnlock/internal/core"
-	"vpnlock/internal/version"
+	"appguard/internal/catalog"
+	"appguard/internal/config"
+	"appguard/internal/core"
+	"appguard/internal/version"
 )
 
 // staleAfter — сколько каталог может не сверяться с репозиторием, прежде чем
@@ -49,7 +49,7 @@ func (e *engine) syncCatalog(clone, problem string) ([]string, error) {
 	var data []byte
 	cloneVersion := ""
 	if _, err := os.Stat(clone); errors.Is(err, fs.ErrNotExist) {
-		problem = "клон " + clone + " не найден — перемещён или удалён; переустанови vpnlock из нового места по setup/README.md"
+		problem = "клон " + clone + " не найден — перемещён или удалён; переустанови appguard из нового места по setup/README.md"
 	} else if problem == "" {
 		var err error
 		if data, err = readClone(clone, catalog.InClone); err != nil {
@@ -85,7 +85,7 @@ func (e *engine) syncCatalog(clone, problem string) ([]string, error) {
 	e.mu.Unlock()
 	if version.Newer(cloneVersion, e.d.Version) {
 		e.record([]core.Event{{Time: now, Kind: core.KindCatalog,
-			Text: fmt.Sprintf("в клоне новая версия vpnlock %s (работает %s) — обнови по разделу «Как обновиться» в setup/README.md", cloneVersion, e.d.Version)}})
+			Text: fmt.Sprintf("в клоне новая версия appguard %s (работает %s) — обнови по разделу «Как обновиться» в setup/README.md", cloneVersion, e.d.Version)}})
 	}
 	return warnings, e.cfg.Update(func(s *config.Settings) {
 		s.CatalogChecked, s.SyncProblem, s.CloneVersion = now, "", cloneVersion
@@ -170,7 +170,7 @@ func (e *engine) remindStale() {
 		why = "ежедневное обновление не доходит до службы"
 	}
 	e.record([]core.Event{{Time: now, Kind: core.KindCatalog,
-		Text: fmt.Sprintf("каталог не обновлялся %d %s: %s%s. Обновить вручную: git pull в клоне, затем vpnlock catalog load",
+		Text: fmt.Sprintf("каталог не обновлялся %d %s: %s%s. Обновить вручную: git pull в клоне, затем appguard catalog load",
 			days, core.Plural(days, "день", "дня", "дней"), why, on)}})
 }
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Установка vpnlock на macOS — одной командой из клона, в программе «Терминал»:
+# Установка appguard на macOS — одной командой из клона, в программе «Терминал»:
 #
 #   ./setup/macos/install.sh
 #
@@ -15,7 +15,7 @@ set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SELF="$REPO/setup/macos/install.sh"
-BIN="$REPO/bin/vpnlock"
+BIN="$REPO/bin/appguard"
 
 section() { printf '\n[%d/5] %s\n' "$1" "$2"; }
 step() { printf '  · %s\n' "$*"; }
@@ -32,7 +32,7 @@ if [ "$(id -u)" -eq 0 ]; then
   exec sudo -H -u "$SUDO_USER" "$SELF" "$@"
 fi
 
-printf 'Установка vpnlock на этот мак. Клон: %s\n' "$REPO"
+printf 'Установка appguard на этот мак. Клон: %s\n' "$REPO"
 
 "$REPO/setup/macos/prepare.sh" --install
 
@@ -43,19 +43,19 @@ if ! sudo -p '  Пароль от мака: ' "$BIN" install 2>&1 | indent; then
 fi
 
 section 5 "Проверяю службу"
-"$BIN" status 2>&1 | indent || fail "Служба не отвечает. Причина — в /Library/Logs/vpnlock/daemon.log."
+"$BIN" status 2>&1 | indent || fail "Служба не отвечает. Причина — в /Library/Logs/appguard/daemon.log."
 
 cat <<'EOF'
 
-✓ Готово: vpnlock установлен и стартует вместе с системой.
+✓ Готово: appguard установлен и стартует вместе с системой.
 
 Дальше — три шага, без sudo:
-  vpnlock apply            программы и сервисы из конфига курса (configs/macos.conf)
-  vpnlock remember <имя>   свой выход VPN: подключи VPN и запомни; повтори для каждого
-  vpnlock rule mine        сервисы открыты только через твои выходы
+  appguard apply            программы и сервисы из готового конфига (configs/macos.conf)
+  appguard remember <имя>   свой выход VPN: подключи VPN и запомни; повтори для каждого
+  appguard rule mine        сервисы открыты только через твои выходы
 
-Защитить что-то своё: vpnlock add Claude — приложение, vpnlock add claude — Claude
-Code; vpnlock — меню, vpnlock help — все команды. Приложение из каталога защищено
+Защитить что-то своё: appguard add Claude — приложение, appguard add claude — Claude
+Code; appguard — меню, appguard help — все команды. Приложение из каталога защищено
 сразу. Остальные сначала учатся: включи VPN и поработай в приложении пару минут —
 статус сменится на «защищено».
 EOF

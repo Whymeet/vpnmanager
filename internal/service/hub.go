@@ -3,7 +3,7 @@ package service
 import (
 	"sync"
 
-	"vpnlock/internal/core"
+	"appguard/internal/core"
 )
 
 // hub раздаёт уведомления тем, кто подписан по каналу службы: на Windows их

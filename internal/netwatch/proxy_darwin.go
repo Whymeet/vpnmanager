@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"vpnlock/internal/core"
+	"appguard/internal/core"
 )
 
 // proxyPoll — как часто наблюдатель перечитывает системный прокси. О смене

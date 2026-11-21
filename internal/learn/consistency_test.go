@@ -3,9 +3,9 @@ package learn_test
 import (
 	"testing"
 
-	"vpnlock/internal/exitcheck"
-	"vpnlock/internal/learn"
-	"vpnlock/internal/resolver"
+	"appguard/internal/exitcheck"
+	"appguard/internal/learn"
+	"appguard/internal/resolver"
 )
 
 // Всё, к чему служба ходит сама по адресу, обязано быть в служебном списке:

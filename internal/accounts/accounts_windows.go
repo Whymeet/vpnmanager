@@ -6,7 +6,7 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"vpnlock/internal/ipc"
+	"appguard/internal/ipc"
 )
 
 // System — учётные записи этой системы.

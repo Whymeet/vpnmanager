@@ -7,10 +7,10 @@ import (
 	"slices"
 	"strings"
 
-	"vpnlock/internal/config"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/learn"
-	"vpnlock/internal/resolver"
+	"appguard/internal/config"
+	"appguard/internal/ipc"
+	"appguard/internal/learn"
+	"appguard/internal/resolver"
 )
 
 // domainState — защищённый домен в памяти службы. Он держится, пока у него

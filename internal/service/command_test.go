@@ -6,10 +6,10 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/apps"
-	"vpnlock/internal/enforce"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/apps"
+	"appguard/internal/enforce"
+	"appguard/internal/ipc"
+	"appguard/internal/service/servicetest"
 )
 
 // Сценарии таски 35: консольная программа на macOS (Claude Code).

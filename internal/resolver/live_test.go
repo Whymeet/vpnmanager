@@ -11,7 +11,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"vpnlock/internal/netwatch"
+	"appguard/internal/netwatch"
 )
 
 func TestLiveUpstreams(t *testing.T) {

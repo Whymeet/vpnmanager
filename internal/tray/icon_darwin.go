@@ -37,12 +37,12 @@ function run(argv) {
   app.setActivationPolicy(1); // Accessory: без значка в Dock
   app.finishLaunching;
   const defaults = $.NSUserDefaults.standardUserDefaults;
-  const position = $('NSStatusItem Preferred Position vpnlock');
+  const position = $('NSStatusItem Preferred Position appguard');
   if (defaults.objectForKey(position).js === undefined) defaults.setDoubleForKey(0, position);
   const item = $.NSStatusBar.systemStatusBar.statusItemWithLength(-2); // квадратный
-  item.autosaveName = $('vpnlock');
+  item.autosaveName = $('appguard');
   const symbol = (name) => {
-    const image = $.NSImage.imageWithSystemSymbolNameAccessibilityDescription(name, 'vpnlock');
+    const image = $.NSImage.imageWithSystemSymbolNameAccessibilityDescription(name, 'appguard');
     image.setTemplate(true);
     return image;
   };
@@ -51,21 +51,21 @@ function run(argv) {
   const output = $.NSFileHandle.fileHandleWithStandardOutput;
   let pending = '';
   ObjC.registerSubclass({
-    name: 'VpnlockTray',
+    name: 'AppguardTray',
     methods: {
       'toggle:': {types: ['void', ['id']], implementation: function (sender) {
         output.writeData($('toggle\n').dataUsingEncoding($.NSUTF8StringEncoding));
       }},
       'input:': {types: ['void', ['id']], implementation: function (note) {
         const data = note.userInfo.objectForKey($('NSFileHandleNotificationDataItem'));
-        if (Number(data.length) === 0) $.exit(0); // vpnlock tray закрыл трубу; длина из моста — не число JS
+        if (Number(data.length) === 0) $.exit(0); // appguard tray закрыл трубу; длина из моста — не число JS
         pending += $.NSString.alloc.initWithDataEncoding(data, $.NSUTF8StringEncoding).js;
         for (let i; (i = pending.indexOf('\n')) >= 0; pending = pending.slice(i + 1)) show(JSON.parse(pending.slice(0, i)));
         input.readInBackgroundAndNotify;
       }},
     },
   });
-  const target = $.VpnlockTray.alloc.init;
+  const target = $.AppguardTray.alloc.init;
 
   const width = 220, inset = 14, pad = 6, row = 28;
   const text = (font, color) => {
@@ -127,7 +127,7 @@ function run(argv) {
 }
 `
 
-// statusItem показывает значок дочерним osascript. Если vpnlock tray умрёт сам,
+// statusItem показывает значок дочерним osascript. Если appguard tray умрёт сам,
 // osascript уберёт launchd: задача без AbandonProcessGroup, и он снимает всю
 // группу процессов. А stdin закроется — и скрипт выйдет сам.
 type statusItem struct {

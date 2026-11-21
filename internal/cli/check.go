@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"vpnlock/internal/browsers"
-	"vpnlock/internal/ipc"
+	"appguard/internal/browsers"
+	"appguard/internal/ipc"
 )
 
 // check — «Проверка»: служба проверяет правила, выход, «Россию напрямую» и
@@ -66,7 +66,7 @@ func movedItems(env Env) []ipc.CheckItem {
 		if env.Moved(a.Name, a.ID) {
 			out = append(out, ipc.CheckItem{Name: a.Name, Result: ipc.CheckFail,
 				Detail: "программа переехала: новая версия не защищена",
-				Hint:   "защити её заново: vpnlock remove " + a.Name + " и vpnlock add " + a.Name})
+				Hint:   "защити её заново: appguard remove " + a.Name + " и appguard add " + a.Name})
 		}
 	}
 	return out
@@ -79,14 +79,14 @@ func browserItems(home string) []ipc.CheckItem {
 	}
 	var out []ipc.CheckItem
 	for _, b := range browsers.Check(home) {
-		it := ipc.CheckItem{Name: b.Browser + ": безопасный DNS", Result: ipc.CheckOK, Detail: "свой не включён — имена идут через vpnlock"}
+		it := ipc.CheckItem{Name: b.Browser + ": безопасный DNS", Result: ipc.CheckOK, Detail: "свой не включён — имена идут через appguard"}
 		if b.On {
 			it.Result = ipc.CheckFail
 			it.Detail = "включён свой"
 			if b.Provider != "" {
 				it.Detail += " (" + b.Provider + ")"
 			}
-			it.Detail += ": браузер узнаёт адреса сервисов мимо vpnlock, и сайт может открыться без VPN"
+			it.Detail += ": браузер узнаёт адреса сервисов мимо appguard, и сайт может открыться без VPN"
 			it.Hint = b.Hint
 		}
 		out = append(out, it)

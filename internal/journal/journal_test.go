@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/core"
+	"appguard/internal/core"
 )
 
 type clock struct{ t time.Time }

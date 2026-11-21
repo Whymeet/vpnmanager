@@ -20,8 +20,8 @@ import (
 
 	"golang.org/x/sys/unix"
 
-	"vpnlock/internal/apps"
-	"vpnlock/internal/procs"
+	"appguard/internal/apps"
+	"appguard/internal/procs"
 )
 
 // classID — метка net_cls на сокетах защищённых процессов: «VLK» и единица. Её
@@ -31,9 +31,9 @@ const classID = 0x564c4b01
 const (
 	// netClsMount — куда служба монтирует иерархию net_cls, если её никто не
 	// смонтировал раньше.
-	netClsMount = "/run/vpnlock/net_cls"
+	netClsMount = "/run/appguard/net_cls"
 	// jailDir — группа защищённых процессов внутри иерархии: по подгруппе на приложение.
-	jailDir = "vpnlock"
+	jailDir = "appguard"
 	// sweepEvery — как часто просматривать процессы: так под защиту попадает то,
 	// что запуск не поймал (скрипт через интерпретатор, запуск при лежащей службе).
 	sweepEvery = 2 * time.Second
@@ -468,11 +468,11 @@ func (j *jail) release(dir string) error {
 	return fmt.Errorf("группа %s: %w", dir, err)
 }
 
-// rootOf — корень иерархии для группы dir: <корень>/vpnlock/<приложение>.
+// rootOf — корень иерархии для группы dir: <корень>/appguard/<приложение>.
 func (j *jail) rootOf(dir string) string { return filepath.Dir(filepath.Dir(dir)) }
 
 // clear снимает перехват и выпускает всех. Работает и там, где set не вызывался:
-// `sudo vpnlock uninstall` — другой процесс, чем служба.
+// `sudo appguard uninstall` — другой процесс, чем служба.
 func (j *jail) clear() error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
@@ -549,7 +549,7 @@ func netClsRoot() (root string, ours bool, err error) {
 	if err := os.MkdirAll(netClsMount, 0o755); err != nil {
 		return "", false, err
 	}
-	if err := unix.Mount("vpnlock", netClsMount, "cgroup", unix.MS_NOSUID|unix.MS_NODEV|unix.MS_NOEXEC, "net_cls"); err != nil {
+	if err := unix.Mount("appguard", netClsMount, "cgroup", unix.MS_NOSUID|unix.MS_NODEV|unix.MS_NOEXEC, "net_cls"); err != nil {
 		return "", false, fmt.Errorf("mount: %w", err)
 	}
 	return netClsMount, true, nil

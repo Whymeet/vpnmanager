@@ -18,10 +18,10 @@ import (
 
 	"golang.org/x/sys/windows"
 
-	"vpnlock/internal/apps"
+	"appguard/internal/apps"
 )
 
-// Объекты vpnlock в WFP: поставщик и подуровень, в котором лежат его фильтры.
+// Объекты appguard в WFP: поставщик и подуровень, в котором лежат его фильтры.
 var (
 	providerID = guid(0x6db456db, 0x8fb4, 0x4043, 0xb5, 0x16, 0x66, 0x0a, 0xdc, 0x4f, 0x39, 0xd8)
 	sublayerID = guid(0xab4f0abe, 0x0188, 0x4e7f, 0x9c, 0x4b, 0xcb, 0x27, 0x04, 0x99, 0x51, 0x2a)
@@ -40,7 +40,7 @@ var aleLayers = []struct {
 	{layerAcceptV6, "accept-v6", true, false},
 }
 
-// Веса фильтров в подуровне vpnlock: побеждает больший. Закрытый прокси сильнее
+// Веса фильтров в подуровне appguard: побеждает больший. Закрытый прокси сильнее
 // петли; петля и проверенный туннель сильнее запрета приложению; запрет
 // приложению сильнее разрешения серверу VPN (защищённое приложение не ходит на
 // адрес CDN мимо туннеля, даже если там сервер VPN), а оно — запрета адресу.
@@ -243,7 +243,7 @@ func (w *WFP) blockAddrs(r Rules, before []string) ([]string, error) {
 				continue
 			}
 			err := w.persist.addFilter(fwFilter{id: ruleID("addr", text, l.name), layer: l.id, sublayer: sublayerID,
-				provider: providerID, name: "vpnlock: " + text + " только через VPN", weight: weightAddrBlock,
+				provider: providerID, name: "appguard: " + text + " только через VPN", weight: weightAddrBlock,
 				persistent: true, remote: netip.AddrPortFrom(a, 0)})
 			if err != nil && !errors.Is(err, fwpAlreadyExists) {
 				return nil, fmt.Errorf("WFP: не удалось закрыть адрес %s: %w", text, err)
@@ -263,17 +263,17 @@ func (w *WFP) permit(subs []subject, r Rules) error {
 	add := func(f fwFilter) { want[f.id] = f }
 	for _, l := range aleLayers {
 		add(fwFilter{id: ruleID("loopback", l.name), layer: l.id, sublayer: sublayerID, provider: providerID,
-			name: "vpnlock: петля", weight: weightPermit, permit: true, loopback: true})
+			name: "appguard: петля", weight: weightPermit, permit: true, loopback: true})
 		for _, a := range r.OpenAddrs {
 			if l.v6 == a.Is6() {
 				add(fwFilter{id: ruleID("tunnel", a.String(), l.name), layer: l.id, sublayer: sublayerID, provider: providerID,
-					name: "vpnlock: через проверенный туннель " + a.String(), weight: weightPermit, permit: true, local: a})
+					name: "appguard: через проверенный туннель " + a.String(), weight: weightPermit, permit: true, local: a})
 			}
 		}
 		for _, a := range r.Servers {
 			if l.connect && l.v6 == a.Is6() {
 				add(fwFilter{id: ruleID("server", a.String(), l.name), layer: l.id, sublayer: sublayerID, provider: providerID,
-					name: "vpnlock: сервер VPN " + a.String(), weight: weightServer, permit: true, remote: netip.AddrPortFrom(a, 0)})
+					name: "appguard: сервер VPN " + a.String(), weight: weightServer, permit: true, remote: netip.AddrPortFrom(a, 0)})
 			}
 		}
 	}
@@ -286,13 +286,13 @@ func (w *WFP) permit(subs []subject, r Rules) error {
 			for _, p := range r.OpenProxies {
 				if l.v6 == p.Addr().Is6() {
 					add(s.on(fwFilter{id: ruleID("proxy-open", s.key, p.String(), l.name), layer: l.id, sublayer: sublayerID,
-						provider: providerID, name: "vpnlock: " + name + " через прокси " + p.String(), weight: weightPermit, permit: true, remote: p}))
+						provider: providerID, name: "appguard: " + name + " через прокси " + p.String(), weight: weightPermit, permit: true, remote: p}))
 				}
 			}
 			for _, p := range r.ClosedProxies {
 				if l.v6 == p.Addr().Is6() {
 					add(s.on(fwFilter{id: ruleID("proxy-closed", s.key, p.String(), l.name), layer: l.id, sublayer: sublayerID,
-						provider: providerID, name: "vpnlock: " + name + " без прокси " + p.String(), weight: weightProxyBlock, remote: p}))
+						provider: providerID, name: "appguard: " + name + " без прокси " + p.String(), weight: weightProxyBlock, remote: p}))
 				}
 			}
 		}
@@ -324,14 +324,14 @@ func (w *WFP) block(s subject) error {
 	name := filepath.Base(s.key)
 	for _, l := range aleLayers {
 		err := w.persist.addFilter(s.on(fwFilter{id: ruleID("block", s.key, l.name), layer: l.id, sublayer: sublayerID,
-			provider: providerID, name: "vpnlock: " + name + " без VPN", weight: weightBlock, persistent: true}))
+			provider: providerID, name: "appguard: " + name + " без VPN", weight: weightBlock, persistent: true}))
 		if err != nil && !errors.Is(err, fwpAlreadyExists) {
 			return fmt.Errorf("WFP: не удалось закрыть %s: %w", s.key, err)
 		}
 		// Загрузочный фильтр — в подуровне по умолчанию и без поставщика: до
 		// старта WFP их ещё нет.
 		err = w.persist.addFilter(s.on(fwFilter{id: ruleID("boot", s.key, l.name), layer: l.id,
-			name: "vpnlock: " + name + " до старта WFP", weight: weightBlock, boot: true}))
+			name: "appguard: " + name + " до старта WFP", weight: weightBlock, boot: true}))
 		if err != nil && !errors.Is(err, fwpAlreadyExists) {
 			w.logOnce("boot "+s.key, "WFP: загрузочный фильтр для %s не поставлен (до старта WFP он не закрыт): %v", s.key, err)
 		}
@@ -353,11 +353,11 @@ func (w *WFP) unblock(key string) error {
 
 // base ставит поставщика и подуровень.
 func (w *WFP) base() error {
-	err := w.persist.addProvider(providerID, "vpnlock", "vpnlock: защищённые приложения выходят в сеть только через проверенный VPN")
+	err := w.persist.addProvider(providerID, "appguard", "appguard: защищённые приложения выходят в сеть только через проверенный VPN")
 	if err != nil && !errors.Is(err, fwpAlreadyExists) {
 		return fmt.Errorf("WFP: поставщик: %w", err)
 	}
-	err = w.persist.addSublayer(sublayerID, providerID, "vpnlock", "фильтры защищённых приложений", 0xffff)
+	err = w.persist.addSublayer(sublayerID, providerID, "appguard", "фильтры защищённых приложений", 0xffff)
 	if err != nil && !errors.Is(err, fwpAlreadyExists) {
 		return fmt.Errorf("WFP: подуровень: %w", err)
 	}
@@ -520,7 +520,7 @@ func (w *WFP) Clear() error {
 	}
 	w.addrs = nil
 	if err := w.persist.deleteSublayer(sublayerID); errors.Is(err, fwpInUse) {
-		errs = append(errs, errors.New("WFP: в подуровне vpnlock остались фильтры, о которых служба не знает"))
+		errs = append(errs, errors.New("WFP: в подуровне appguard остались фильтры, о которых служба не знает"))
 	} else if err != nil && !errors.Is(err, fwpSublayerNotFound) {
 		errs = append(errs, fmt.Errorf("WFP: подуровень: %w", err))
 	}
@@ -533,7 +533,7 @@ func (w *WFP) Clear() error {
 	return errors.Join(errs...)
 }
 
-// Verify сверяет фильтры с правилами r: подуровень vpnlock на месте, под
+// Verify сверяет фильтры с правилами r: подуровень appguard на месте, под
 // фильтрами те же приложения и адреса, что в правилах, у каждой программы
 // приложений есть запрет, у адресов — на выборку. Сам фильтров не меняет;
 // расхождение — и следующий Apply ставит все запреты на адреса заново.
@@ -548,7 +548,7 @@ func (w *WFP) Verify(r Rules) error {
 		return fmt.Errorf("WFP не отвечает: %w", err)
 	}
 	if !ok {
-		return errors.New("подуровень vpnlock в WFP снят")
+		return errors.New("подуровень appguard в WFP снят")
 	}
 	state, err := w.load()
 	if err != nil {
@@ -602,14 +602,14 @@ func (w *WFP) open(dynamic bool) error {
 		w.said, w.watches, w.changed = map[string]bool{}, map[string]*dirWatch{}, make(chan struct{}, 1)
 	}
 	if w.persist == nil {
-		e, err := openEngine("vpnlock", false)
+		e, err := openEngine("appguard", false)
 		if err != nil {
 			return fmt.Errorf("WFP: %w", err)
 		}
 		w.persist = e
 	}
 	if dynamic && w.dynamic == nil {
-		e, err := openEngine("vpnlock: сеть через проверенный VPN", true)
+		e, err := openEngine("appguard: сеть через проверенный VPN", true)
 		if err != nil {
 			return fmt.Errorf("WFP: %w", err)
 		}
@@ -688,7 +688,7 @@ func keys(targets []string) []string {
 // ruleID — постоянный идентификатор фильтра по его смыслу: так фильтры
 // находятся и снимаются и после перезапуска службы.
 func ruleID(parts ...string) windows.GUID {
-	sum := sha256.Sum256([]byte("vpnlock\x00" + strings.Join(parts, "\x00")))
+	sum := sha256.Sum256([]byte("appguard\x00" + strings.Join(parts, "\x00")))
 	g := windows.GUID{
 		Data1: binary.LittleEndian.Uint32(sum[0:4]),
 		Data2: binary.LittleEndian.Uint16(sum[4:6]),

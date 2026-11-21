@@ -9,9 +9,9 @@ import (
 
 	"golang.org/x/net/publicsuffix"
 
-	"vpnlock/internal/dnswatch"
-	"vpnlock/internal/learn"
-	"vpnlock/internal/resolver"
+	"appguard/internal/dnswatch"
+	"appguard/internal/learn"
+	"appguard/internal/resolver"
 )
 
 // Answers — ответы DNS на интерфейсе: какие имена стоят за адресами

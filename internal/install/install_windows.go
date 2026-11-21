@@ -20,7 +20,7 @@ import (
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 
-	"vpnlock/internal/paths"
+	"appguard/internal/paths"
 )
 
 // Installer ставит и снимает установку по раскладке Layout.
@@ -32,6 +32,8 @@ type Installer struct {
 	Clear func() error
 	// Note — что сказать человеку после установки (про каталог); пусто — нечего.
 	Note string
+	// Legacy — прежняя установка vpnlock: забрать настройки и снять. nil — не искать.
+	Legacy *Legacy
 }
 
 // Права на папки данных в SDDL. Владелец — администраторы (BA). P — права не
@@ -57,7 +59,11 @@ func (in *Installer) Install(src string) error {
 		return fmt.Errorf("диспетчер служб Windows: %w", err)
 	}
 	defer m.Disconnect()
-	// Работающая служба держит свой vpnlock.exe: заменить его можно только
+	carry, err := in.takeLegacy()
+	if err != nil {
+		return err
+	}
+	// Работающая служба держит свой appguard.exe: заменить его можно только
 	// после остановки.
 	if err := stopService(m); err != nil {
 		return fmt.Errorf("не удалось остановить прежнюю службу: %w", err)
@@ -77,8 +83,12 @@ func (in *Installer) Install(src string) error {
 	if err := secure(L.LogDir, logSDDL); err != nil {
 		return fmt.Errorf("права на %s: %w", L.LogDir, err)
 	}
+	moved, err := in.restoreLegacy(carry)
+	if err != nil {
+		return err
+	}
 	if err := put(src, L.Binary); err != nil {
-		return fmt.Errorf("не удалось скопировать vpnlock: %w", err)
+		return fmt.Errorf("не удалось скопировать appguard: %w", err)
 	}
 	note, err := in.installCatalog(src)
 	if err != nil {
@@ -89,16 +99,17 @@ func (in *Installer) Install(src string) error {
 		return err
 	}
 	if err := addToPath(filepath.Dir(L.Binary)); err != nil {
-		return fmt.Errorf("не удалось добавить vpnlock в PATH: %w", err)
+		return fmt.Errorf("не удалось добавить appguard в PATH: %w", err)
 	}
 	if err := startService(m, L.Binary); err != nil {
 		return err
 	}
 	in.Note = joinNotes(in.Note, in.installTasks(src))
+	in.Note = joinNotes(in.Note, moved)
 	return nil
 }
 
-// put кладёт src на место dst. Работающий файл (команду vpnlock log в
+// put кладёт src на место dst. Работающий файл (команду appguard log в
 // другом окне, агента уведомлений) Windows заменить не даёт, но даёт
 // переименовать: прежний уезжает во временную папку Windows.
 func put(src, dst string) error {
@@ -112,13 +123,13 @@ func put(src, dst string) error {
 }
 
 // installTasks ставит задачи планировщика: агента уведомлений, значок службы и
-// ежедневное обновление каталога. Все запускают vpnlockw.exe — тот же vpnlock без
-// окна консоли, его собирает подготовка рядом с vpnlock.exe. Не встали — служба
+// ежедневное обновление каталога. Все запускают appguardw.exe — тот же appguard без
+// окна консоли, его собирает подготовка рядом с appguard.exe. Не встали — служба
 // работает и так; человек узнаёт почему.
 func (in *Installer) installTasks(src string) string {
 	quietSrc := filepath.Join(filepath.Dir(src), filepath.Base(in.Layout.QuietExe))
 	if _, err := os.Stat(quietSrc); err != nil {
-		return "Уведомления, значок и ежедневное обновление каталога не поставлены: рядом с vpnlock.exe нет vpnlockw.exe — запусти подготовку ещё раз."
+		return "Уведомления, значок и ежедневное обновление каталога не поставлены: рядом с appguard.exe нет appguardw.exe — запусти подготовку ещё раз."
 	}
 	if err := put(quietSrc, in.Layout.QuietExe); err != nil {
 		return fmt.Sprintf("Уведомления, значок и ежедневное обновление каталога не поставлены: %v", err)
@@ -129,23 +140,23 @@ func (in *Installer) installTasks(src string) string {
 // installNotifyTask: при входе любого пользователя в его сеансе запускается
 // агент уведомлений.
 func (in *Installer) installNotifyTask() string {
-	if err := createTask(paths.NotifyTask, userTaskXML(in.Layout.QuietExe, "notify-agent", "vpnlock: уведомления об открытии и закрытии защищённых сервисов")); err != nil {
+	if err := createTask(paths.NotifyTask, userTaskXML(in.Layout.QuietExe, "notify-agent", "appguard: уведомления об открытии и закрытии защищённых сервисов")); err != nil {
 		return fmt.Sprintf("Уведомления не поставлены: %v", err)
 	}
 	if schtasks("/Run", "/TN", paths.NotifyTask) != nil {
 		return "Уведомления об открытии и закрытии сервисов заработают после следующего входа в Windows."
 	}
-	return "Уведомления об открытии и закрытии сервисов включены: их показывает задача vpnlock-notify при входе в Windows."
+	return "Уведомления об открытии и закрытии сервисов включены: их показывает задача appguard-notify при входе в Windows."
 }
 
 // trayPin — Windows 11 прячет новые значки, а закрепить значок программно штатного
 // способа нет: недокументированный IsPromoted в реестре не трогаем.
-const trayPin = "Windows прячет новые значки за стрелку ^ на панели задач: перетащи значок vpnlock оттуда к часам, один раз."
+const trayPin = "Windows прячет новые значки за стрелку ^ на панели задач: перетащи значок appguard оттуда к часам, один раз."
 
 // installTrayTask: при входе любого пользователя в его сеансе запускается значок
 // службы. При обновлении /Run запускает второй экземпляр, он видит мьютекс и выходит.
 func (in *Installer) installTrayTask() string {
-	if err := createTask(paths.TrayTask, userTaskXML(in.Layout.QuietExe, "tray", "vpnlock: значок службы рядом с часами")); err != nil {
+	if err := createTask(paths.TrayTask, userTaskXML(in.Layout.QuietExe, "tray", "appguard: значок службы рядом с часами")); err != nil {
 		return fmt.Sprintf("Значок не поставлен: %v. Защита работает и без него.", err)
 	}
 	// Прежний значок (при обновлении — прошлой версии) снимается: новый при живом
@@ -154,10 +165,10 @@ func (in *Installer) installTrayTask() string {
 	if schtasks("/Run", "/TN", paths.TrayTask) != nil {
 		return "Значок появится рядом с часами после следующего входа в Windows. " + trayPin
 	}
-	return "Значок vpnlock появился рядом с часами: щит — защищённые приложения в сети, перечёркнутый щит — без сети. По щелчку — что с защитой и выключатель уведомлений. " + trayPin
+	return "Значок appguard появился рядом с часами: щит — защищённые приложения в сети, перечёркнутый щит — без сети. По щелчку — что с защитой и выключатель уведомлений. " + trayPin
 }
 
-// installCatalogTask: раз в сутки и при входе того, кто ставит vpnlock, git
+// installCatalogTask: раз в сутки и при входе того, кто ставит appguard, git
 // pull в его клоне — с его ключами и паролями, — и служба берёт каталог из
 // клона. Задача работает без повышения: в клон пишут и обычные программы, и
 // хук git, подложенный туда, с наивысшими правами получил бы права
@@ -186,7 +197,7 @@ func catalogTaskXML(exe, clone, sid string) string {
 	return `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>vpnlock: каталог приложений из клона, раз в сутки</Description>
+    <Description>appguard: каталог приложений из клона, раз в сутки</Description>
   </RegistrationInfo>
   <Triggers>
     <LogonTrigger>
@@ -271,7 +282,7 @@ func userTaskXML(exe, arg, description string) string {
 
 // createTask заводит задачу из XML. schtasks читает XML задачи в UTF-16.
 func createTask(name, xmlText string) error {
-	f, err := os.CreateTemp("", "vpnlock-task-*.xml")
+	f, err := os.CreateTemp("", "appguard-task-*.xml")
 	if err != nil {
 		return err
 	}
@@ -314,7 +325,7 @@ func startService(m *mgr.Mgr, binary string) error {
 	switch {
 	case errors.Is(err, windows.ERROR_SERVICE_DOES_NOT_EXIST):
 		s, err = m.CreateService(paths.ServiceName, binary, mgr.Config{
-			DisplayName: "vpnlock",
+			DisplayName: "appguard",
 			Description: description,
 			StartType:   mgr.StartAutomatic,
 		}, "daemon")
@@ -330,7 +341,7 @@ func startService(m *mgr.Mgr, binary string) error {
 			return err
 		}
 		c.BinaryPathName = syscall.EscapeArg(binary) + " daemon"
-		c.DisplayName, c.Description, c.StartType = "vpnlock", description, mgr.StartAutomatic
+		c.DisplayName, c.Description, c.StartType = "appguard", description, mgr.StartAutomatic
 		if err := s.UpdateConfig(c); err != nil {
 			s.Close()
 			return fmt.Errorf("не удалось обновить службу: %w", err)
@@ -356,7 +367,7 @@ func startService(m *mgr.Mgr, binary string) error {
 }
 
 // stopService останавливает службу, если она есть и работает, и ждёт, пока её
-// процесс завершится: до этого Windows не даст заменить или удалить vpnlock.exe.
+// процесс завершится: до этого Windows не даст заменить или удалить appguard.exe.
 func stopService(m *mgr.Mgr) error {
 	s, err := m.OpenService(paths.ServiceName)
 	if errors.Is(err, windows.ERROR_SERVICE_DOES_NOT_EXIST) {
@@ -439,9 +450,9 @@ func (in *Installer) Uninstall() error {
 	if err := removeFromPath(filepath.Dir(L.Binary)); err != nil {
 		errs = append(errs, fmt.Errorf("PATH: %w", err))
 	}
-	// Удаляют обычно установленной командой, то есть этим же vpnlock.exe, а
-	// агенты уведомлений и значки ещё работают из vpnlockw.exe: работающие файлы
-	// Windows удалить не даёт. Значок сам выйдет, когда увидит, что vpnlock удалён.
+	// Удаляют обычно установленной командой, то есть этим же appguard.exe, а
+	// агенты уведомлений и значки ещё работают из appguardw.exe: работающие файлы
+	// Windows удалить не даёт. Значок сам выйдет, когда увидит, что appguard удалён.
 	for _, f := range []string{L.Binary, L.QuietExe} {
 		if err := removeBusy(f); err != nil {
 			errs = append(errs, err)
@@ -490,7 +501,7 @@ func moveAside(path string) error {
 	if err != nil {
 		return err
 	}
-	aside := filepath.Join(win, "Temp", fmt.Sprintf("vpnlock-%d-%d-%s", os.Getpid(), time.Now().UnixNano(), filepath.Base(path)))
+	aside := filepath.Join(win, "Temp", fmt.Sprintf("appguard-%d-%d-%s", os.Getpid(), time.Now().UnixNano(), filepath.Base(path)))
 	if err := os.Rename(path, aside); err != nil {
 		return fmt.Errorf("не удалось убрать работающий %s: %w", path, err)
 	}
@@ -501,11 +512,11 @@ func moveAside(path string) error {
 	return windows.MoveFileEx(p, nil, windows.MOVEFILE_DELAY_UNTIL_REBOOT)
 }
 
-// Remove — служба не снимает себя сама: свой vpnlock.exe и открытые файлы
-// журнала ей не удалить. На Windows vpnlock удаляют из PowerShell от имени
+// Remove — служба не снимает себя сама: свой appguard.exe и открытые файлы
+// журнала ей не удалить. На Windows appguard удаляют из PowerShell от имени
 // администратора, и команда снимает всё на месте (Uninstall).
 func (in *Installer) Remove() error {
-	return errors.New("на Windows vpnlock удаляют из PowerShell от имени администратора: vpnlock uninstall")
+	return errors.New("на Windows appguard удаляют из PowerShell от имени администратора: appguard uninstall")
 }
 
 // Stop просит диспетчер служб остановить службу, не дожидаясь этого.
@@ -523,7 +534,7 @@ func (in *Installer) Stop() error {
 	return stopPlanned(s)
 }
 
-// stopPlanned останавливает службу, предупредив, что остановку начал vpnlock
+// stopPlanned останавливает службу, предупредив, что остановку начал appguard
 // (обновление, удаление): без предупреждения она выйдет с ошибкой, и диспетчер
 // служб запустит её снова.
 func stopPlanned(s *mgr.Service) error {
@@ -560,7 +571,7 @@ func own(string) error { return nil }
 const envKey = `SYSTEM\CurrentControlSet\Control\Session Manager\Environment`
 
 // addToPath дописывает dir в конец системного PATH, если его там ещё нет.
-// Команда vpnlock появится в новых окнах PowerShell.
+// Команда appguard появится в новых окнах PowerShell.
 func addToPath(dir string) error {
 	return editPath(func(path string) string {
 		for part := range strings.SplitSeq(path, ";") {

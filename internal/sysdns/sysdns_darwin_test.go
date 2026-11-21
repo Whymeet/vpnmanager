@@ -27,7 +27,7 @@ func TestSetWritesAndRemovesOnlyOurs(t *testing.T) {
 		t.Fatalf("%v %v", skipped, err)
 	}
 	data, _ := os.ReadFile(filepath.Join(r.Dir, "notion.so"))
-	for _, want := range []string{"# vpnlock", "nameserver 127.0.0.1", "port 53535"} {
+	for _, want := range []string{"# appguard", "nameserver 127.0.0.1", "port 53535"} {
 		if !strings.Contains(string(data), want) {
 			t.Fatalf("в файле нет %q:\n%s", want, data)
 		}

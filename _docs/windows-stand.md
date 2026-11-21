@@ -1,6 +1,6 @@
 # Стенд Windows
 
-Windows-часть vpnlock проверяется живьём на Windows 11 в Parallels на маке
+Windows-часть appguard проверяется живьём на Windows 11 в Parallels на маке
 автора. Код под Windows пишется на маке и проверяется там сборкой и `vet`:
 
 ```bash
@@ -14,12 +14,12 @@ GOOS=windows GOARCH=arm64 tools/go build ./... && GOOS=windows GOARCH=arm64 tool
 ## Виртуалка
 
 1. Parallels Desktop → «Файл» → «Создать» → «Загрузить Windows 11 из Microsoft».
-   На Apple Silicon это Windows 11 ARM64 — vpnlock собирается под неё сам
+   На Apple Silicon это Windows 11 ARM64 — appguard собирается под неё сам
    (`GOARCH=arm64`). Учётную запись при установке завести **администратором**.
 2. **Сеть — режим моста.** «Настроить» → «Оборудование» → «Сеть» → «Источник»:
    «Сеть с мостом» → Wi-Fi (или Ethernet, через который мак в сети). В общем
    режиме (Shared) трафик виртуалки идёт через мак — через его pf с якорем
-   vpnlock и его VPN, и результат на Windows ничего не говорит. Проверка: в
+   appguard и его VPN, и результат на Windows ничего не говорит. Проверка: в
    виртуалке `ipconfig` показывает адрес из домашней сети (как у мака), а не
    10.211.55.x.
 3. «Настроить» → «Параметры» → «Общий доступ»: снять «Общий доступ к папкам Mac»
@@ -35,13 +35,13 @@ GOOS=windows GOARCH=arm64 tools/go build ./... && GOOS=windows GOARCH=arm64 tool
    - Claude Code: `irm https://claude.ai/install.ps1 | iex` в PowerShell;
    - VPN-клиент (AmneziaVPN, WireGuard, Hiddify) — для задач с туннелями.
 7. Снимок «чистая Windows» (Действия → «Сделать снимок») — до первой установки
-   vpnlock. К нему откатываются перед проверкой установки с нуля.
+   appguard. К нему откатываются перед проверкой установки с нуля.
 
 ## Клон
 
 Рабочий репозиторий автора приватный: внутри виртуалки `gh auth login`, затем
-`gh repo clone <личный remote> vpnlock`. Другой путь — `git bundle create
-vpnlock.bundle --all` на маке и `git clone vpnlock.bundle vpnlock` в Windows.
+`gh repo clone <личный remote> appguard`. Другой путь — `git bundle create
+appguard.bundle --all` на маке и `git clone appguard.bundle appguard` в Windows.
 
 ## Проверка скелета (задача 14)
 
@@ -53,37 +53,37 @@ powershell -NoProfile -ExecutionPolicy Bypass -File setup\windows\prepare.ps1
 
 - **Без прав (К2).** Под обычным пользователем подготовка и `install.ps1`
   останавливаются на шаге 1: «нет прав администратора … В системе ничего не
-  изменено». После обоих: `Get-Service vpnlock` — службы нет,
-  `Test-Path 'C:\Program Files\vpnlock'` — `False`.
+  изменено». После обоих: `Get-Service appguard` — службы нет,
+  `Test-Path 'C:\Program Files\appguard'` — `False`.
 - **Установка (К1, таски 39 и 41).** Под администратором: двойной щелчок по
   `install.cmd` в Проводнике (окно в конце ждёт клавишу) и ещё раз — `.\install.cmd`
   в обычном PowerShell. Так же работает
   `powershell -NoProfile -ExecutionPolicy Bypass -File setup\windows\install.ps1`.
   Шаги `[1/5]`…`[5/5]`; на четвёртом — окно UAC, «Да», окно установки
-  закрывается само, его вывод («Служба vpnlock … работает») — в исходном окне,
+  закрывается само, его вывод («Служба appguard … работает») — в исходном окне,
   затем статус. Ещё раз — в UAC «Нет»: «Windows не дал прав администратора …
   ничего не изменено». И из PowerShell от имени администратора — без UAC.
-- **Служба.** `sc.exe qc vpnlock` — `AUTO_START`, `LocalSystem`, путь
-  `"C:\Program Files\vpnlock\bin\vpnlock.exe" daemon`; `sc.exe qfailure vpnlock`
-  — три перезапуска. Права папок: `icacls C:\ProgramData\vpnlock\state` — только
-  SYSTEM и Администраторы; `icacls C:\ProgramData\vpnlock\logs` — ещё и
+- **Служба.** `sc.exe qc appguard` — `AUTO_START`, `LocalSystem`, путь
+  `"C:\Program Files\appguard\bin\appguard.exe" daemon`; `sc.exe qfailure appguard`
+  — три перезапуска. Права папок: `icacls C:\ProgramData\appguard\state` — только
+  SYSTEM и Администраторы; `icacls C:\ProgramData\appguard\logs` — ещё и
   Пользователи на чтение.
-- **Права клиента.** В новом обычном окне PowerShell `vpnlock status` —
-  «Служба: работает с …». Там же `vpnlock rule mine` — отказ с подсказкой
+- **Права клиента.** В новом обычном окне PowerShell `appguard status` —
+  «Служба: работает с …». Там же `appguard rule mine` — отказ с подсказкой
   открыть PowerShell от имени администратора; в окне от имени администратора —
   проходит.
-- **Перезагрузка (К3).** После неё, не трогая ничего, `vpnlock status` —
+- **Перезагрузка (К3).** После неё, не трогая ничего, `appguard status` —
   служба работает с времени загрузки.
-- **Обрыв.** `taskkill /F /FI "SERVICES eq vpnlock"` — через секунду служба
-  снова работает, `vpnlock log` пишет «перезапущена: прошлый запуск
+- **Обрыв.** `taskkill /F /FI "SERVICES eq appguard"` — через секунду служба
+  снова работает, `appguard log` пишет «перезапущена: прошлый запуск
   оборвался».
-- **Удаление (К4).** В обычном окне `vpnlock uninstall` — отказ без вопроса. В
-  окне от имени администратора — вопрос, «да», «vpnlock удалён». После:
-  `Get-Service vpnlock` — нет, `C:\Program Files\vpnlock` и
-  `C:\ProgramData\vpnlock` — нет, в `[Environment]::GetEnvironmentVariable('Path','Machine')`
-  нет `vpnlock\bin`. Повторная установка проходит начисто.
+- **Удаление (К4).** В обычном окне `appguard uninstall` — отказ без вопроса. В
+  окне от имени администратора — вопрос, «да», «appguard удалён». После:
+  `Get-Service appguard` — нет, `C:\Program Files\appguard` и
+  `C:\ProgramData\appguard` — нет, в `[Environment]::GetEnvironmentVariable('Path','Machine')`
+  нет `appguard\bin`. Повторная установка проходит начисто.
 
-Журнал вывода службы — `C:\ProgramData\vpnlock\logs\daemon.log`.
+Журнал вывода службы — `C:\ProgramData\appguard\logs\daemon.log`.
 
 ## Туннели и проверка выхода (задача 15)
 
@@ -103,8 +103,8 @@ $env:GOFLAGS='-mod=vendor'; $env:CGO_ENABLED='0'
 
 На установленной службе:
 
-- **VPN включили** — `vpnlock status` за 2 секунды показывает «VPN: <адаптер> —
-  выход …, страна — проверен», `vpnlock log` — ту же строку. **Выключили** —
+- **VPN включили** — `appguard status` за 2 секунды показывает «VPN: <адаптер> —
+  выход …, страна — проверен», `appguard log` — ту же строку. **Выключили** —
   «VPN: нет».
 - **Смена выхода** внутри подключения (другой сервер в клиенте без
   переподключения) — статус меняется не позже чем через 5 секунд.
@@ -125,10 +125,10 @@ $env:GOFLAGS='-mod=vendor'; $env:CGO_ENABLED='0'
 ```
 
 На установленной службе, приложение — например, `curl.exe`, скопированный в
-`C:\vpnlock-test\curl.exe`, или настоящее (Notion):
+`C:\appguard-test\curl.exe`, или настоящее (Notion):
 
-- `vpnlock add "C:\vpnlock-test\curl.exe"` (от имени администратора) —
-  «защищено». VPN выключен — `C:\vpnlock-test\curl.exe https://1.1.1.1` не
+- `appguard add "C:\appguard-test\curl.exe"` (от имени администратора) —
+  «защищено». VPN выключен — `C:\appguard-test\curl.exe https://1.1.1.1` не
   соединяется, журнал — закрытие с причиной.
 - VPN включили — curl работает не раньше, чем журнал покажет проверенный выход,
   и не позже чем через 2 секунды (К14).
@@ -137,15 +137,15 @@ $env:GOFLAGS='-mod=vendor'; $env:CGO_ENABLED='0'
   внутри подключения — закрыто за 5 секунд (К18).
 - Правило брандмауэра на источники проверки — закрыто, «не удалось проверить
   выход» (К19).
-- `taskkill /F /FI "SERVICES eq vpnlock"` — пока служба поднимается, curl не
+- `taskkill /F /FI "SERVICES eq appguard"` — пока служба поднимается, curl не
   соединяется: разрешения были в её динамической сессии.
 - Перезагрузка без VPN — curl без сети сразу после входа (К21); `netsh wfp show
-  filters file=C:\wfp.xml` — в `wfp.xml` фильтры `vpnlock: … без VPN`.
+  filters file=C:\wfp.xml` — в `wfp.xml` фильтры `appguard: … без VPN`.
 - Десять переключений VPN с запущенным приложением и запись `pktmon` на
   физическом адаптере — ни одного пакета приложения (К15). Пакеты процесса видны
   в Wireshark по `pktmon etl2pcap`; проще — по адресам, к которым ходит
   приложение.
-- `vpnlock uninstall` — `netsh wfp show filters` больше не показывает `vpnlock`,
+- `appguard uninstall` — `netsh wfp show filters` больше не показывает `appguard`,
   curl работает как до установки.
 
 ## Приложения, Store, обновления, прокси (задача 17)
@@ -156,15 +156,15 @@ $env:GOFLAGS='-mod=vendor'; $env:CGO_ENABLED='0'
 
 На установленной службе, в PowerShell от имени администратора:
 
-- `vpnlock` → «Добавить приложение» — в списке программы из меню «Пуск» и
+- `appguard` → «Добавить приложение» — в списке программы из меню «Пуск» и
   приложения Store (с именами, как в «Пуске»); выбранное — «защищено» сразу
-  (К6, К8). `vpnlock status` показывает его под этим именем.
+  (К6, К8). `appguard status` показывает его под этим именем.
 - Приложение на Squirrel (Discord, Slack): защищается папка
   `%LOCALAPPDATA%\Discord` с `Update.exe` и `app-*`. Обновление (или копия
   `app-*` в новую папку с другой версией) без VPN — новая версия без сети (К23).
 - Приложение Store (WhatsApp, Spotify из Store): без VPN без сети; обновление
   через Store — по-прежнему без сети (К23).
-- `vpnlock remove <имя>` — предупреждение о домашнем адресе, «да» — сеть у
+- `appguard remove <имя>` — предупреждение о домашнем адресе, «да» — сеть у
   приложения есть и без VPN (К9).
 - Клиент VPN в режиме системного прокси (Hiddify, v2rayN — «системный прокси»)
   и выход прокси не проверен (сервер в России): защищённое приложение без сети,
@@ -182,7 +182,7 @@ $env:GOFLAGS='-mod=vendor'; $env:CGO_ENABLED='0'
 
 `TestLiveWFPClosesServiceAddressForAllPrograms` закрывает 1.1.1.1 для всех
 программ (системный curl), открывает с «проверенного» адреса и как сервер VPN.
-`TestLiveNRPTSendsDomainToService` ставит правило на `vpnlock-live.test` и
+`TestLiveNRPTSendsDomainToService` ставит правило на `appguard-live.test` и
 поднимает DNS на `127.53.53.53:53`.
 
 На установленной службе с защищённым Notion:
@@ -193,50 +193,50 @@ $env:GOFLAGS='-mod=vendor'; $env:CGO_ENABLED='0'
 - Клиент с «Россией напрямую» (Hiddify, профиль Happ с правилом для России):
   журнал и статус сообщают об этом с подсказкой; запись `pktmon` на физическом
   адаптере — ни одного пакета к адресам защищённых сервисов (К17).
-- `vpnlock uninstall` — в `Get-DnsClientNrptPolicy` нет правил vpnlock,
-  `netsh wfp show filters` — нет фильтров vpnlock.
+- `appguard uninstall` — в `Get-DnsClientNrptPolicy` нет правил appguard,
+  `netsh wfp show filters` — нет фильтров appguard.
 
 ## Устойчивость и уведомления (задача 19)
 
-- `taskkill /F /FI "SERVICES eq vpnlock"` при защищённом приложении и
+- `taskkill /F /FI "SERVICES eq appguard"` при защищённом приложении и
   включённом VPN — пока служба поднимается, приложение без сети (её разрешения
   были в динамической сессии WFP); через секунду-другую служба снова работает,
-  `vpnlock log` — «перезапущена: прошлый запуск оборвался» (К22). `Stop-Service
-  vpnlock` — служба выходит с ошибкой и через секунду снова работает
-  (`Get-Service vpnlock`), в журнале «служба остановлена» и «служба … запущена»,
-  в `logs\daemon.log` — «остановили не через vpnlock» (К22). `vpnlock
-  update` и `vpnlock uninstall` останавливают её без перезапуска. Пока служба
-  не работает, `vpnlock` пишет «служба не отвечает — защита держится».
+  `appguard log` — «перезапущена: прошлый запуск оборвался» (К22). `Stop-Service
+  appguard` — служба выходит с ошибкой и через секунду снова работает
+  (`Get-Service appguard`), в журнале «служба остановлена» и «служба … запущена»,
+  в `logs\daemon.log` — «остановили не через appguard» (К22). `appguard
+  update` и `appguard uninstall` останавливают её без перезапуска. Пока служба
+  не работает, `appguard` пишет «служба не отвечает — защита держится».
 - Выключить VPN дольше чем на 15 секунд — уведомление «Защищённые приложения без
   сети: VPN выключен» от «Windows PowerShell»; ещё раз то же закрытие — без нового
   уведомления. Включить VPN — «Защищённые приложения в сети: выход <адрес>,
   <страна>», повторные проверки того же выхода — без нового уведомления. Выключить
   и сразу включить VPN — ни одного уведомления (К26).
-  `vpnlock notifications off` — уведомлений нет, журнал пишется.
-- `schtasks /Query /TN vpnlock-notify` — задача есть; после входа в Диспетчере
-  задач — `vpnlockw.exe` пользователя. Если уведомлений нет — Параметры →
+  `appguard notifications off` — уведомлений нет, журнал пишется.
+- `schtasks /Query /TN appguard-notify` — задача есть; после входа в Диспетчере
+  задач — `appguardw.exe` пользователя. Если уведомлений нет — Параметры →
   Система → Уведомления → «Windows PowerShell».
-- `vpnlock uninstall` — задачи нет, `vpnlockw.exe` сам завершается через
+- `appguard uninstall` — задачи нет, `appguardw.exe` сам завершается через
   несколько секунд.
 
 ## Паритет с macOS (задача 20)
 
-- `vpnlock` — те же пункты меню, что на маке; каждый — и командой (К5).
-- `vpnlock remember Server 1` с проверенным выходом, `vpnlock rule mine` —
+- `appguard` — те же пункты меню, что на маке; каждый — и командой (К5).
+- `appguard remember Server 1` с проверенным выходом, `appguard rule mine` —
   при другом выходе приложение без сети, журнал — «не из твоего списка» (К10–К12).
-- `vpnlock log` — события в реальном времени; файлы старше недели в
-  `C:\ProgramData\vpnlock\state\journal` удаляются (К25). `vpnlock status` —
+- `appguard log` — события в реальном времени; файлы старше недели в
+  `C:\ProgramData\appguard\state\journal` удаляются (К25). `appguard status` —
   правило, выход, приложения, каталог, версия, служба (К27).
-- Каталог: `schtasks /Query /TN vpnlock-catalog /V /FO LIST` — от имени
-  ученика, без повышения (не «Наивысшие»); `schtasks /Run /TN vpnlock-catalog` — в журнале
+- Каталог: `schtasks /Query /TN appguard-catalog /V /FO LIST` — от имени
+  ученика, без повышения (не «Наивысшие»); `schtasks /Run /TN appguard-catalog` — в журнале
   «каталог обновлён» или почему нет; отозванный доступ к репозиторию —
   «доступ к репозиторию закрыт», защита на прежнем каталоге (К29, К31, К32).
   Приложение из каталога (`windows.exe` или `windows.store` в
   `catalog/catalog.json`) — «защищено по каталогу», его сайт закрыт и в браузере.
-- `vpnlock check` — правила (фильтры WFP), выход, «Россия напрямую», каждый
+- `appguard check` — правила (фильтры WFP), выход, «Россия напрямую», каждый
   сервис мимо VPN через физический адаптер, «безопасный DNS» Chrome, Edge,
   Brave и Firefox (К33, К34).
-- `vpnlock uninstall` — задачи `vpnlock-catalog` нет.
+- `appguard uninstall` — задачи `appguard-catalog` нет.
 
 ## Значок службы (задача 43)
 
@@ -250,24 +250,24 @@ $env:GOFLAGS='-mod=vendor'; $env:CGO_ENABLED='0'
 На установленной службе:
 
 - **Появился.** Сразу после `install.cmd` значок-щит рядом с часами или за стрелкой
-  `^`, подсказка «vpnlock», «Приложения в сети» и выход. Установка напомнила, как
+  `^`, подсказка «appguard», «Приложения в сети» и выход. Установка напомнила, как
   закрепить его.
 - **Закрепление.** Перетащить значок из `^` к часам; после перезагрузки он на месте.
 - **После входа.** Перезагрузка, вход: значок появился сам, без окна консоли.
   Проверить, что задача заработала и при входе раньше готовности панели задач.
-- **Задача.** `schtasks /Query /TN vpnlock-tray /V /FO LIST` — при входе, группа
+- **Задача.** `schtasks /Query /TN appguard-tray /V /FO LIST` — при входе, группа
   «Пользователи», без повышения.
-- **Один экземпляр.** `schtasks /Run /TN vpnlock-tray` ещё раз, затем
-  `Get-CimInstance Win32_Process -Filter "Name='vpnlockw.exe'" | Select ProcessId,CommandLine`
+- **Один экземпляр.** `schtasks /Run /TN appguard-tray` ещё раз, затем
+  `Get-CimInstance Win32_Process -Filter "Name='appguardw.exe'" | Select ProcessId,CommandLine`
   — ровно один процесс с `tray`.
 - **Explorer.** `Stop-Process -Name explorer` — панель задач вернулась, значок снова
   на месте (`TaskbarCreated`).
 - **Служба остановилась.** `Stop-Service` её перезапустит (К22), поэтому в PowerShell
-  от имени администратора: `sc.exe control vpnlock 200; sc.exe stop vpnlock` — значок
-  исчез не позже чем через 30 секунд. `Start-Service vpnlock` — вернулся за 5 секунд.
+  от имени администратора: `sc.exe control appguard 200; sc.exe stop appguard` — значок
+  исчез не позже чем через 30 секунд. `Start-Service appguard` — вернулся за 5 секунд.
 - **Второй пользователь.** Вход обычным пользователем — у него свой значок.
 - **Масштаб 150%.** Значок чёткий, на светлой и тёмной теме читается.
-- **Обновление.** `vpnlock update` — значок новой версии сразу, без нового входа
+- **Обновление.** `appguard update` — значок новой версии сразу, без нового входа
   (`/End` прежнего перед `/Run`), второго нет.
 - **Картинка (задача 45).** VPN включён и выход проверен — зелёный щит; VPN
   выключен — серый щит с красной чертой. Смена — за 2–3 секунды.
@@ -275,15 +275,15 @@ $env:GOFLAGS='-mod=vendor'; $env:CGO_ENABLED='0'
   в сети» и «Выход …, <страна>» (или «Приложения без сети» и причина), черта,
   «Уведомления» с галочкой. Меню открывается с первого щелчка, щелчок мимо его
   закрывает.
-- **Уведомления из меню.** Снять галочку — `vpnlock status` в обычном окне
+- **Уведомления из меню.** Снять галочку — `appguard status` в обычном окне
   PowerShell: «Уведомления: выключены»; поставить — «включены». Прав
   администратора не спрашивает.
-- **Удаление.** `vpnlock uninstall` — значок исчез за несколько секунд,
-  `schtasks /Query /TN vpnlock-tray` — задачи нет, процесса `vpnlockw.exe tray` нет.
+- **Удаление.** `appguard uninstall` — значок исчез за несколько секунд,
+  `schtasks /Query /TN appguard-tray` — задачи нет, процесса `appguardw.exe tray` нет.
 
 ## Запись трафика (задачи 16–19)
 
 На физическом адаптере — встроенный `pktmon` (от имени администратора):
-`pktmon start --capture --comp nics -f C:\vpnlock.etl`, переключения VPN,
-`pktmon stop`, затем `pktmon etl2pcap C:\vpnlock.etl` и разбор в Wireshark на
+`pktmon start --capture --comp nics -f C:\appguard.etl`, переключения VPN,
+`pktmon stop`, затем `pktmon etl2pcap C:\appguard.etl` и разбор в Wireshark на
 маке.

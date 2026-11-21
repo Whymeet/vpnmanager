@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/service/servicetest"
+	"appguard/internal/ipc"
+	"appguard/internal/service/servicetest"
 )
 
 // Сценарии таски 12: «Проверка» по пунктам. Соединение мимо VPN на шве

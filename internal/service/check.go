@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"vpnlock/internal/core"
-	"vpnlock/internal/ipc"
+	"appguard/internal/core"
+	"appguard/internal/ipc"
 )
 
 // reachTimeout — сколько проверка ждёт соединения с сервисом мимо VPN. pf
@@ -47,14 +47,14 @@ func (e *engine) checkRules() ipc.CheckItem {
 	default:
 		if err := e.d.Enforce.Verify(r); err != nil {
 			it.Result, it.Detail = ipc.CheckFail, "сброшены: "+err.Error()
-			it.Hint = "сторож службы возвращает их за секунду — запусти проверку ещё раз; если пункт не проходит снова, причина в vpnlock log"
+			it.Hint = "сторож службы возвращает их за секунду — запусти проверку ещё раз; если пункт не проходит снова, причина в appguard log"
 			return it
 		}
 		n := len(r.V4) + len(r.V6)
 		it.Result, it.Detail = ipc.CheckOK, fmt.Sprintf("на месте: в таблицах %d %s", n, core.Plural(n, "адрес", "адреса", "адресов"))
 		return it
 	}
-	it.Hint = "причина — в vpnlock log"
+	it.Hint = "причина — в appguard log"
 	return it
 }
 
@@ -120,7 +120,7 @@ func (e *engine) checkReach(ctx context.Context) []ipc.CheckItem {
 	}
 	list, servers := e.services()
 	if len(list) == 0 {
-		return []ipc.CheckItem{{Name: "Сервисы мимо VPN", Result: ipc.CheckWarn, Detail: "защищённых сервисов пока нет", Hint: "добавь приложение: vpnlock add"}}
+		return []ipc.CheckItem{{Name: "Сервисы мимо VPN", Result: ipc.CheckWarn, Detail: "защищённых сервисов пока нет", Hint: "добавь приложение: appguard add"}}
 	}
 	ctx, cancel := context.WithTimeout(ctx, reachTimeout)
 	defer cancel()
@@ -149,14 +149,14 @@ func (e *engine) checkReach(ctx context.Context) []ipc.CheckItem {
 			slices.SortFunc(reached[i], netip.Addr.Compare)
 			it.Result = ipc.CheckFail
 			it.Detail = fmt.Sprintf("достижим через %s: %s", phys.Name, core.JoinAddrs(reached[i]))
-			it.Hint = "правила не держат этот адрес — что с файрволом, видно в vpnlock log"
+			it.Hint = "правила не держат этот адрес — что с файрволом, видно в appguard log"
 		case len(tried) == 0 && len(svc.addrs) == 0 && runtime.GOOS != "darwin":
 			// На Windows и Linux приложение закрыто по своим программам сразу, а
 			// адреса сервиса появятся, когда оно поработает через проверенный VPN.
 			it.Result, it.Detail = ipc.CheckWarn, "приложение закрыто по своим программам, а адресов его сервиса пока нет — до тех пор сайт в браузере без VPN откроется"
-			it.Hint = "открой приложение при включённом VPN — адреса и домены сервиса запомнятся; закрыть сайт сразу: vpnlock protect <домен сервиса>"
+			it.Hint = "открой приложение при включённом VPN — адреса и домены сервиса запомнятся; закрыть сайт сразу: appguard protect <домен сервиса>"
 			if runtime.GOOS == "linux" { // здесь адреса приложений не учатся
-				it.Hint = "закрыть и сайт сервиса: vpnlock protect <домен сервиса>"
+				it.Hint = "закрыть и сайт сервиса: appguard protect <домен сервиса>"
 			}
 		case len(tried) == 0 && len(svc.addrs) == 0:
 			it.Result, it.Detail = ipc.CheckWarn, "адресов пока нет — они появятся, когда приложение выйдет в сеть через VPN"

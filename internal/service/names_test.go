@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"vpnlock/internal/dnswatch"
+	"appguard/internal/dnswatch"
 )
 
 // Поток ответов с разными именами на один адрес не раздувает кэш: у адреса не

@@ -4,10 +4,10 @@ import (
 	"bufio"
 	"fmt"
 
-	"vpnlock/internal/tui"
+	"appguard/internal/tui"
 )
 
-// menu — `vpnlock` без аргументов: пункты выбираются стрелками, после каждого
+// menu — `appguard` без аргументов: пункты выбираются стрелками, после каждого
 // действия — снова меню. Каждое действие есть и отдельной командой.
 func menu(env Env) int {
 	items := []struct {
@@ -53,13 +53,13 @@ func header(env Env) string {
 	st, ok := statusQuiet(env)
 	switch {
 	case !ok && !installed(env.Layout):
-		return "vpnlock не установлен"
+		return "appguard не установлен"
 	case !ok:
 		// Правила файрвола живут в ядре, а не в службе: пока её нет, сервисы
 		// закрыты, и система её перезапускает.
-		return "vpnlock — служба не отвечает — защита держится"
+		return "appguard — служба не отвечает — защита держится"
 	}
-	line := "vpnlock " + st.Version + " — служба работает"
+	line := "appguard " + st.Version + " — служба работает"
 	switch len(st.Paths) {
 	case 0:
 		line += ", VPN нет"

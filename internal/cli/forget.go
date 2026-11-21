@@ -6,14 +6,14 @@ import (
 	"slices"
 	"strings"
 
-	"vpnlock/internal/core"
-	"vpnlock/internal/ipc"
-	"vpnlock/internal/tui"
+	"appguard/internal/core"
+	"appguard/internal/ipc"
+	"appguard/internal/tui"
 )
 
-// forget — «Забыть»: выход из моих, по имени или адресу (vpnlock forget
+// forget — «Забыть»: выход из моих, по имени или адресу (appguard forget
 // Германия), или адреса и домены, которые приложение выучило по ошибке
-// (vpnlock forget claude 34.149.66.165). Без аргумента в терминале — выбор
+// (appguard forget claude 34.149.66.165). Без аргумента в терминале — выбор
 // выхода из списка.
 func forget(env Env, args []string) int {
 	st, ok := currentStatus(env)
@@ -56,8 +56,8 @@ func forget(env Env, args []string) int {
 	return forgetLearned(env, a, args[1:])
 }
 
-const forgetUsage = `Забыть выход: vpnlock forget Германия (или его адрес).
-Убрать у приложения адрес или домен, выученный по ошибке: vpnlock forget claude 34.149.66.165 example.com — что оно выучило, покажет vpnlock status claude.`
+const forgetUsage = `Забыть выход: appguard forget Германия (или его адрес).
+Убрать у приложения адрес или домен, выученный по ошибке: appguard forget claude 34.149.66.165 example.com — что оно выучило, покажет appguard status claude.`
 
 func hasExit(exits []ipc.ExitStatus, which string) bool {
 	ip, err := netip.ParseAddr(which)
@@ -80,7 +80,7 @@ func forgetExit(env Env, st *ipc.Status, which string) int {
 	}
 	left := len(st.Exits) - len(resp.Exits)
 	if st.Rule == core.RuleMine && left <= 0 {
-		fmt.Fprintln(env.Out, "В списке больше нет ни одного выхода, а правило — «только мои выходы»: защищённые сервисы закрыты при любом VPN. Запомни свой выход или верни правило: vpnlock rule any")
+		fmt.Fprintln(env.Out, "В списке больше нет ни одного выхода, а правило — «только мои выходы»: защищённые сервисы закрыты при любом VPN. Запомни свой выход или верни правило: appguard rule any")
 	}
 	return 0
 }
@@ -107,7 +107,7 @@ func forgetLearned(env Env, a ipc.AppStatus, items []string) int {
 	return 0
 }
 
-// appDetail — vpnlock status <приложение>: что оно выучило и что из этого убрано.
+// appDetail — appguard status <приложение>: что оно выучило и что из этого убрано.
 func appDetail(env Env, name string) int {
 	st, ok := currentStatus(env)
 	if !ok {
@@ -134,7 +134,7 @@ func appDetail(env Env, name string) int {
 		fmt.Fprintf(env.Out, "Забыто: %s\n", strings.Join(d.Forgotten, ", "))
 	}
 	if len(d.Addrs)+len(d.Domains) > 0 {
-		fmt.Fprintf(env.Out, "Убрать выученное по ошибке: vpnlock forget %s <адрес или домен>\n", quoted(resp.App.Name))
+		fmt.Fprintf(env.Out, "Убрать выученное по ошибке: appguard forget %s <адрес или домен>\n", quoted(resp.App.Name))
 	}
 	return 0
 }
