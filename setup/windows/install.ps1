@@ -16,6 +16,11 @@
 
 param([switch]$Elevated, [string]$Log)
 
+# vpnmanager: после службы — свой конфиг (Claude и его сайты только через VPN) и
+# окно «Мои VPN», всё в том же окне администратора, чтобы Windows спросила
+# разрешение один раз.
+$Config = 'configs\claude-vpn.conf'
+
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 
 $Repo = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
@@ -28,14 +33,29 @@ function Fail([string]$msg) { [Console]::Error.WriteLine("  ✗ $msg"); exit 1 }
 
 if ($env:OS -ne 'Windows_NT') { Fail 'Это не Windows: здесь установка не подходит.' }
 
-# Окно администратора с шага 4: ставит службу и оставляет вывод для исходного
-# окна. Строки ошибок программы приходят записями ошибок — в файл идёт их текст.
+# Служба, конфиг, окно «Мои VPN». Строки ошибок программы приходят записями
+# ошибок — дальше идёт их текст.
+function Install-All {
+  & $Exe install 2>&1 | ForEach-Object { "$_" }
+  if ($LASTEXITCODE -ne 0) { $script:code = $LASTEXITCODE; return }
+  $installed = Join-Path $env:ProgramFiles 'appguard\bin\appguard.exe'
+  ''
+  'Включаю защиту Claude (конфиг ' + $Config + '):'
+  & $installed apply (Join-Path $Repo $Config) 2>&1 | ForEach-Object { "$_" }
+  if ($LASTEXITCODE -ne 0) { $script:code = $LASTEXITCODE; return }
+  ''
+  'Открываю окно «Мои VPN» — добавь свой VPN и нажми «Готово».'
+  & $installed vpn 2>&1 | ForEach-Object { "$_" }
+  $script:code = 0
+}
+
+# Окно администратора с шага 4: всё ставит и оставляет вывод для исходного окна.
 if ($Elevated) {
   Write-Host 'Ставлю службу appguard — окно закроется само.'
-  & $Exe install 2>&1 | ForEach-Object { "$_" } | Tee-Object -Variable lines | Out-Host
-  $code = $LASTEXITCODE
+  $script:code = 1
+  Install-All | Tee-Object -Variable lines | Out-Host
   if ($Log) { $lines | Set-Content -Encoding UTF8 -Path $Log }
-  exit $code
+  exit $script:code
 }
 
 Write-Host "Установка appguard на этот компьютер. Клон: $Repo"
@@ -46,12 +66,13 @@ if ($LASTEXITCODE -ne 0) { exit 1 }
 $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
 $admin = $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 if ($admin) {
-  Section 4 'Ставлю службу'
-  & $Exe install 2>&1 | ForEach-Object { Write-Host "  $_" }
-  $code = $LASTEXITCODE
+  Section 4 'Ставлю службу и включаю защиту Claude'
+  $script:code = 1
+  Install-All | ForEach-Object { Write-Host "  $_" }
+  $code = $script:code
 } else {
-  Section 4 'Ставлю службу — Windows спросит разрешение'
-  Step 'На вопрос «Разрешить этому приложению вносить изменения?» ответь «Да». Откроется окно установки и закроется само.'
+  Section 4 'Ставлю службу и включаю защиту Claude — Windows спросит разрешение'
+  Step 'На вопрос «Разрешить этому приложению вносить изменения?» ответь «Да». Откроется окно установки, потом окно «Мои VPN».'
   $logFile = Join-Path ([IO.Path]::GetTempPath()) ('appguard-install-' + [Guid]::NewGuid() + '.log')
   try {
     $p = Start-Process -FilePath 'powershell.exe' -Verb RunAs -Wait -PassThru -ErrorAction Stop -ArgumentList @(
@@ -74,11 +95,8 @@ Section 5 'Проверяю службу'
 if ($LASTEXITCODE -ne 0) { Fail 'Служба не отвечает. Причина — в C:\ProgramData\appguard\logs\daemon.log.' }
 
 Write-Host ''
-Write-Host '✓ Готово: appguard установлен и стартует вместе с Windows.'
+Write-Host '✓ Готово: защита стоит и включается сама вместе с Windows.'
 Write-Host ''
-Write-Host 'Дальше — в новом окне PowerShell от имени администратора (меню «Пуск» → «PowerShell»,'
-Write-Host 'правой кнопкой — «Запуск от имени администратора»): в открытых окнах команды appguard ещё нет.'
-Write-Host '  appguard apply            программы и сервисы из готового конфига (configs\windows.conf)'
-Write-Host '  appguard remember <имя>   свой выход VPN: подключи VPN и запомни; повтори для каждого'
-Write-Host '  appguard rule mine        сервисы открыты только через твои выходы'
-Write-Host '  appguard                  меню: добавить приложение, правило, проверка'
+Write-Host '  Claude (приложение, Cowork, сайт в браузере) работает только через VPN из списка «Мои VPN».'
+Write-Host '  Щит у часов: с замком — Claude открыт, перечёркнутый — закрыт.'
+Write-Host '  Изменить список VPN: щёлкни по щиту → «Мои VPN…».'

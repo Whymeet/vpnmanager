@@ -26,6 +26,7 @@ func TestScriptCompiles(t *testing.T) {
 		"$('" + NotifyItem + "')", "NSSwitch", "notify.action = 'toggle:'", "toggle\\n", // переключатель и что он пишет
 		"const width = 220", "preferredMaxLayoutWidth", // меню узкое, длинная причина переносится
 		"readInBackgroundAndNotify", "Number(data.length) === 0", // новые виды из stdin, конец stdin — выход
+		"'vpn:'", "vpn\\n", "argv[1] === 'vpn'", // пункт «Мои VPN…»
 		"app.run",
 	} {
 		if !strings.Contains(script, want) {

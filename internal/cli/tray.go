@@ -48,6 +48,7 @@ func trayCmd(env Env) int {
 		fmt.Fprintf(env.Err, "значок: %v\n", err)
 		return 1
 	}
+	tray.OpenVPN = vpnOpener(env)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	tray.Loop{

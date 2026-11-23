@@ -1,0 +1,7 @@
+# Переводы строк фиксированы: Git для Windows иначе превращает LF в CRLF.
+* text=auto eol=lf
+*.cmd text eol=crlf
+# install.cmd — общий файл для sh и cmd.exe: только LF
+/install.cmd text eol=lf
+*.ps1 text eol=lf
+*.png binary

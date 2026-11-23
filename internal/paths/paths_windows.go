@@ -40,6 +40,7 @@ type Layout struct {
 	LogDir     string
 	LogFile    string // вывод службы: старт, остановка, ошибки
 	CloneFile  string // из какого клона поставлен appguard: оттуда его обновляет `appguard update`
+	ExitsUI    string // окно «Мои VPN» (exits.ps1): в папке программы, менять может только администратор
 }
 
 // Traces — что остаётся на диске от установки: есть хоть одно — appguard
@@ -77,6 +78,7 @@ func layout(programFiles, programData, pipe string) Layout {
 		LogDir:     logs,
 		LogFile:    filepath.Join(logs, "daemon.log"),
 		CloneFile:  filepath.Join(app, "clone"),
+		ExitsUI:    filepath.Join(app, "exits.ps1"),
 	}
 }
 

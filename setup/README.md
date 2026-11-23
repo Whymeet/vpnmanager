@@ -4,8 +4,8 @@
 > один файл на все системы:
 >
 > ```bash
-> git clone https://github.com/XoDefender/appguard.git
-> cd appguard
+> git clone <адрес внутреннего репозитория vpnmanager>
+> cd vpnmanager
 > ./install.cmd        # macOS — в программе «Терминал»; Linux — в терминале
 > .\install.cmd        # Windows — в PowerShell, или двойной щелчок в Проводнике
 > ```
@@ -153,11 +153,11 @@ VPN, выход которого инструмент проверил сам. �
 
 ## Шаг 2. Клонирование
 
-Репозиторий открытый — аккаунт GitHub не нужен:
+Репозиторий внутренний — адрес даёт тот, кто ведёт проект:
 
 ```bash
-git clone https://github.com/XoDefender/appguard.git
-cd appguard
+git clone <адрес внутреннего репозитория vpnmanager>
+cd vpnmanager
 ```
 
 Нет `git` — на macOS `xcode-select --install` (или `brew install git`), на

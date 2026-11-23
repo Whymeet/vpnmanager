@@ -1,11 +1,34 @@
 # CLAUDE.md
 
-appguard — служба для macOS и Windows: защищённые приложения выходят в сеть только
-через VPN, выход которого инструмент проверил сам. Это рабочий репозиторий автора;
-открытая копия https://github.com/XoDefender/appguard собирается из него станком
-раздачи — без спек и личного.
+vpnmanager — внутренний проект: Claude (Desktop, Cowork, Code, сайты) выходит в
+сеть только через VPN на нашем VPS. Основа — форк appguard
+(https://github.com/XoDefender/appguard, коммит bdcf89c, remote `upstream`;
+лицензии у исходника нет). Обзор и установка — `README.md`.
 
-- Спека и таски — `_specs/appguard/`, работа идёт по ним: `/implement appguard`.
+- Своё поверх appguard: `configs/claude-vpn.conf` (Claude + `rule mine`, без
+  выходов, тест `TestClaudeVPNConfigParses`), окно «Мои VPN» и одна команда
+  установки (ниже), `wsl/` — kill switch для Claude Code в WSL (nftables +
+  проверка выхода, bash; фильтры WFP процессы WSL не видят).
+- Окно «Мои VPN» — `internal/exitsui/exits.ps1` (WinForms, UTF-8 с BOM,
+  встроено в бинарник), установка пишет его в `Layout.ExitsUI`
+  (`Program Files\appguard\exits.ps1`: пишет только администратор, окно
+  работает с его правами). Без прав окно перезапускает себя через UAC. Всё
+  делает `appguard.exe`: `status --json`, `remember`, `forget`, `rule mine`.
+  Открывают: `install.ps1` (в окне администратора после `install` и `apply`
+  конфига — UAC один раз), пункт «Мои VPN…» щита (`tray.OpenVPN`, задаёт
+  `cli/vpn_windows.go`) и `appguard vpn`.
+- macOS: конфиг `configs/claude-vpn-macos.conf` (`app Claude`, `app claude`),
+  `setup/macos/install.sh` шагом 5 применяет его и открывает `appguard vpn`.
+  Окно — диалоги osascript (`cli/vpn_darwin.go`, AppleScript, тексты —
+  аргументами), логика общая и с тестами на Linux (`cli/vpn_dialog.go`, шов
+  `vpnUI`/`vpnOps`). Пункт щита — `vpn:` в скрипте `tray/icon_darwin.go`
+  (показан, если вторым аргументом `vpn`), пишет `vpn` в stdout → `tray.OpenVPN`
+  запускает `appguard vpn` отдельным процессом. Права: группа admin, без sudo.
+- От автора не тянется ничего само: `catalog sync` без вышестоящей ветки в сеть
+  не ходит (`cli/sync.go`, тест `TestNoUpstreamBranchSyncsNothing`). Его правки —
+  вручную: `git fetch upstream && git merge upstream/main`.
+- Внутреннее имя программы пока appguard (модуль, служба, пути) — переименование
+  сломает установленные копии и прежний переход с vpnlock.
 - До 0.23.0 инструмент назывался vpnlock. Установка appguard находит прежнюю
   (`paths.LegacySystem`), забирает её настройки и снимает её её же бинарником
   `uninstall --yes` (`install/legacy.go`); переход для людей — «Был vpnlock» в
@@ -17,6 +40,10 @@ appguard — служба для macOS и Windows: защищённые прил
 
 - Go ставит `setup/macos/prepare.sh` в `.toolchain/` клона (в git не попадает),
   он же собирает `bin/appguard`.
+- Файлы запуска по системам: `install-windows.cmd` (только Windows, CRLF) и
+  `install-mac.command` (только macOS, проверяет `uname`); тест
+  `TestInstallersAreSplit` следит, что каждый берёт свой установщик и конфиг.
+  Общий `install.cmd` оставлен для совместимости (Linux, тесты, старые инструкции).
 - Установка — одна команда человека: `install.cmd` в корне — один файл на обе
   системы (первая строка `:; exec …` — для sh пустая команда и переход в
   `setup/macos/install.sh`, для cmd.exe — метка; дальше cmd.exe запускает

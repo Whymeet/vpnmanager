@@ -1,0 +1,221 @@
+#!/bin/bash
+# claude-killswitchd — kill switch для Claude в WSL.
+#
+# Раз в CHECK_INTERVAL секунд проверяет, через какой адрес WSL выходит в интернет
+# (два независимых источника, отдельно IPv4 и IPv6). Совпал с ALLOWED_EXITS —
+# сети Anthropic открыты; нет — закрыты в nftables (таблица inet claude_ks), а
+# запущенный Claude Code завершается. Любая неясность (источник не ответил,
+# источники разошлись) — закрыто.
+#
+#   claude-killswitchd run      цикл службы (systemd)
+#   claude-killswitchd close    закрыть сразу (ExecStartPre / ExecStopPost)
+#   claude-killswitchd check    один прогон проверки без изменений, вывод на экран
+#   claude-killswitchd remove   снять таблицу (удаление)
+set -uo pipefail
+
+CONF="${CLAUDE_KS_CONF:-/etc/claude-killswitch.conf}"
+STATE_DIR="${CLAUDE_KS_STATE:-/run/claude-killswitch}"
+TABLE="claude_ks"
+DRY_RUN="${DRY_RUN:-0}"
+
+ALLOWED_EXITS=""
+CHECK_INTERVAL=5
+KILL_ON_CLOSE=yes
+ANTHROPIC_V4="160.79.104.0/23"
+ANTHROPIC_V6="2607:6bc0::/48"
+EXTRA_DOMAINS=""
+RESOLVE_EVERY=300
+
+log() { printf '%s\n' "$*" >&2; }
+
+load_conf() {
+  if [ -r "$CONF" ]; then
+    # shellcheck source=/dev/null
+    . "$CONF"
+  else
+    log "нет $CONF — всё закрыто"
+  fi
+}
+
+# --- выход -------------------------------------------------------------------
+
+# exit_ip <4|6> <источник> — адрес выхода по источнику или пустая строка.
+exit_ip() {
+  local fam="$1" src="$2" out
+  case "$src" in
+    cloudflare)
+      local url="https://1.1.1.1/cdn-cgi/trace"
+      [ "$fam" = 6 ] && url="https://[2606:4700:4700::1111]/cdn-cgi/trace"
+      out=$(curl -"$fam" -fsS --max-time 4 "$url" 2>/dev/null | sed -n 's/^ip=//p')
+      ;;
+    ipify)
+      local url="https://api.ipify.org"
+      [ "$fam" = 6 ] && url="https://api6.ipify.org"
+      out=$(curl -"$fam" -fsS --max-time 4 "$url" 2>/dev/null)
+      ;;
+  esac
+  out="${out//[$'\r\n ']/}"
+  if [[ "$out" =~ ^[0-9a-fA-F:.]+$ ]]; then printf '%s' "$out"; fi
+}
+
+allowed() {
+  local ip="$1" a
+  [ -n "$ip" ] || return 1
+  for a in $ALLOWED_EXITS; do
+    [ "${a,,}" = "${ip,,}" ] && return 0
+  done
+  return 1
+}
+
+# judge <4|6> — печатает "open <адрес>" или "closed <причина>".
+judge() {
+  local fam="$1" a b tmp
+  tmp=$(mktemp)
+  exit_ip "$fam" cloudflare >"$tmp" &   # два источника параллельно
+  b=$(exit_ip "$fam" ipify)
+  wait $! 2>/dev/null
+  a=$(cat "$tmp"); rm -f "$tmp"
+  if [ -z "$a" ] && [ -z "$b" ]; then
+    echo "closed нет-сети-IPv$fam"; return
+  fi
+  if [ -n "$a" ] && [ -n "$b" ] && [ "${a,,}" != "${b,,}" ]; then
+    echo "closed источники-разошлись:$a/$b"; return
+  fi
+  local ip="${a:-$b}"
+  if allowed "$ip"; then echo "open $ip"; else echo "closed чужой-выход:$ip"; fi
+}
+
+# --- nftables ----------------------------------------------------------------
+
+resolve_extra() {
+  local d v4="" v6="" ip
+  for d in $EXTRA_DOMAINS; do
+    while read -r ip _; do
+      if [[ "$ip" == *:* ]]; then v6+="$ip, "; else v4+="$ip, "; fi
+    done < <(getent ahosts "$d" 2>/dev/null | awk '{print $1}' | sort -u)
+  done
+  EXTRA4="${v4%, }"
+  EXTRA6="${v6%, }"
+}
+
+ruleset() {
+  local open4="$1" open6="$2" r4="" r6=""
+  if [ "$open4" != open ]; then
+    r4=$'\t\tip daddr @anth4 meta l4proto tcp reject with tcp reset\n\t\tip daddr @anth4 reject\n'
+  fi
+  if [ "$open6" != open ]; then
+    r6=$'\t\tip6 daddr @anth6 meta l4proto tcp reject with tcp reset\n\t\tip6 daddr @anth6 reject\n'
+  fi
+  local e4="$ANTHROPIC_V4" e6="$ANTHROPIC_V6"
+  [ -n "${EXTRA4:-}" ] && e4="$e4, $EXTRA4"
+  [ -n "${EXTRA6:-}" ] && e6="$e6, $EXTRA6"
+  cat <<EOF
+table inet $TABLE
+delete table inet $TABLE
+table inet $TABLE {
+	set anth4 { type ipv4_addr; flags interval; auto-merge; elements = { $e4 } }
+	set anth6 { type ipv6_addr; flags interval; auto-merge; elements = { $e6 } }
+	chain ks_out {
+		type filter hook output priority -10; policy accept;
+$r4$r6	}
+	chain ks_forward {
+		type filter hook forward priority -10; policy accept;
+$r4$r6	}
+}
+EOF
+}
+
+apply() {
+  local text
+  text=$(ruleset "$1" "$2")
+  if [ "$DRY_RUN" = 1 ]; then printf '%s\n' "$text"; return 0; fi
+  printf '%s\n' "$text" | nft -f -
+}
+
+table_ok() {
+  [ "$DRY_RUN" = 1 ] && return 0
+  nft list table inet "$TABLE" >/dev/null 2>&1
+}
+
+# --- Claude Code ---------------------------------------------------------------
+
+kill_claude() {
+  [ "$KILL_ON_CLOSE" = yes ] || return 0
+  local p exe
+  for p in /proc/[0-9]*; do
+    exe=$(readlink "$p/exe" 2>/dev/null) || continue
+    case "$exe" in
+      */.local/share/claude/versions/*|*/node_modules/@anthropic-ai/claude-code/*)
+        log "VPN нет — завершаю Claude Code (pid ${p#/proc/})"
+        [ "$DRY_RUN" = 1 ] || kill -TERM "${p#/proc/}" 2>/dev/null
+        ;;
+    esac
+  done
+}
+
+write_state() {
+  [ "$DRY_RUN" = 1 ] && return 0
+  mkdir -p "$STATE_DIR"
+  printf 'state=%s\nipv4=%s\nipv6=%s\nchecked=%s\n' "$1" "$2" "$3" "$(date -Is)" \
+    >"$STATE_DIR/state.tmp" && mv "$STATE_DIR/state.tmp" "$STATE_DIR/state"
+  chmod 644 "$STATE_DIR/state"
+}
+
+notify_systemd() { command -v systemd-notify >/dev/null && systemd-notify "$@" 2>/dev/null; }
+
+# --- команды -----------------------------------------------------------------
+
+cmd_close() {
+  load_conf
+  EXTRA4="" EXTRA6=""
+  apply closed closed
+  write_state closed "закрыто" "закрыто"
+}
+
+cmd_check() {
+  load_conf
+  echo "Разрешённые выходы: ${ALLOWED_EXITS:-<нет>}"
+  echo "IPv4: $(judge 4)"
+  echo "IPv6: $(judge 6)"
+}
+
+cmd_run() {
+  load_conf
+  local last="" last_resolve=0 now j4 j6 s4 s6 overall
+  EXTRA4="" EXTRA6=""
+  apply closed closed
+  write_state closed "старт" "старт"
+  notify_systemd --ready
+  while :; do
+    now=$(date +%s)
+    if [ $((now - last_resolve)) -ge "$RESOLVE_EVERY" ]; then
+      resolve_extra; last_resolve=$now; last=""
+    fi
+    j4=$(judge 4); j6=$(judge 6)
+    s4=${j4%% *}; s6=${j6%% *}
+    # Хотя бы одно семейство открыто — Claude работает (через открытое).
+    if [ "$s4" = open ] || [ "$s6" = open ]; then overall=open; else overall=closed; fi
+    if [ "$s4 $s6" != "$last" ] || ! table_ok; then
+      if apply "$s4" "$s6"; then
+        log "IPv4: $j4 | IPv6: $j6 → $overall"
+        last="$s4 $s6"
+      else
+        log "nft не применил правила — повтор"
+        last=""
+      fi
+    fi
+    [ "$overall" = closed ] && kill_claude
+    write_state "$overall" "$j4" "$j6"
+    notify_systemd WATCHDOG=1
+    sleep "$CHECK_INTERVAL"
+  done
+}
+
+case "${1:-}" in
+  run) cmd_run ;;
+  close) cmd_close ;;
+  check) cmd_check ;;
+  remove) [ "$DRY_RUN" = 1 ] || nft delete table inet "$TABLE" 2>/dev/null; rm -rf "$STATE_DIR" ;;
+  ruleset) load_conf; resolve_extra; ruleset "${2:-closed}" "${3:-closed}" ;;
+  *) echo "использование: $0 run|close|check|remove|ruleset [open4] [open6]" >&2; exit 2 ;;
+esac

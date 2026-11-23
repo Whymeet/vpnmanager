@@ -42,20 +42,19 @@ if ! sudo -p '  Пароль от мака: ' "$BIN" install 2>&1 | indent; then
   fail "Служба не поставлена — причина выше. Исправь её и запусти установку ещё раз: \"$SELF\"."
 fi
 
-section 5 "Проверяю службу"
-"$BIN" status 2>&1 | indent || fail "Служба не отвечает. Причина — в /Library/Logs/appguard/daemon.log."
+section 5 "Включаю защиту Claude"
+"$BIN" status >/dev/null 2>&1 || fail "Служба не отвечает. Причина — в /Library/Logs/appguard/daemon.log."
+if ! "$BIN" apply "$REPO/configs/claude-vpn-macos.conf" 2>&1 | indent; then
+  fail "Защита Claude не включена — причина выше. Запусти установку ещё раз: \"$SELF\"."
+fi
+step "Открываю окно «Мои VPN» — добавь свой VPN и нажми «Готово»."
+"$BIN" vpn 2>&1 | indent || true
 
 cat <<'EOF'
 
-✓ Готово: appguard установлен и стартует вместе с системой.
+✓ Готово: защита стоит и включается сама вместе с маком.
 
-Дальше — три шага, без sudo:
-  appguard apply            программы и сервисы из готового конфига (configs/macos.conf)
-  appguard remember <имя>   свой выход VPN: подключи VPN и запомни; повтори для каждого
-  appguard rule mine        сервисы открыты только через твои выходы
-
-Защитить что-то своё: appguard add Claude — приложение, appguard add claude — Claude
-Code; appguard — меню, appguard help — все команды. Приложение из каталога защищено
-сразу. Остальные сначала учатся: включи VPN и поработай в приложении пару минут —
-статус сменится на «защищено».
+  Claude (приложение, Cowork, Claude Code, сайт в браузере) работает только через
+  VPN из списка «Мои VPN». Щит в строке меню: с замком — Claude открыт,
+  перечёркнутый — закрыт. Изменить список VPN: щит → «Мои VPN…».
 EOF

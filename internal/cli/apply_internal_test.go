@@ -86,6 +86,32 @@ func TestRepoConfigsParse(t *testing.T) {
 	}
 }
 
+// Конфиг проекта «Claude только через свои VPN»: разбирается, задаёт правило
+// mine (без него Claude открывался бы через любой VPN) и не держит выходов —
+// их вводит пользователь в окне «Мои VPN».
+func TestClaudeVPNConfigParses(t *testing.T) {
+	for _, name := range []string{"claude-vpn.conf", "claude-vpn-macos.conf"} {
+		data, err := os.ReadFile(filepath.Join("..", "..", "configs", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		lines, err := parseConfig(data)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		var mine bool
+		for _, l := range lines {
+			mine = mine || (l.key == "rule" && len(l.args) == 1 && l.args[0] == "mine")
+			if l.key == "exit" {
+				t.Errorf("%s, строка %d: выход в общем конфиге — выходы вводит пользователь", name, l.n)
+			}
+		}
+		if !mine {
+			t.Fatalf("%s: нет rule mine", name)
+		}
+	}
+}
+
 func TestExpandPercent(t *testing.T) {
 	env := map[string]string{"USERPROFILE": `C:\Users\Иван`}
 	lookup := func(k string) (string, bool) { v, ok := env[k]; return v, ok }

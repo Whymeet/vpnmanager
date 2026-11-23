@@ -1,0 +1,38 @@
+#!/bin/bash
+# claude-guard — запускает Claude Code только при проверенном VPN.
+# Подключается функцией `claude` в /etc/bash.bashrc и /etc/zsh/zshrc (ставит install.sh).
+#
+#   claude-guard [аргументы claude]   запустить Claude Code
+#   claude-guard --status             состояние kill switch
+STATE=/run/claude-killswitch/state
+
+read_state() {
+  state="" ipv4="" ipv6="" checked=""
+  [ -r "$STATE" ] || return 1
+  while IFS='=' read -r k v; do
+    case "$k" in state) state=$v ;; ipv4) ipv4=$v ;; ipv6) ipv6=$v ;; checked) checked=$v ;; esac
+  done <"$STATE"
+}
+
+if [ "${1:-}" = "--status" ]; then
+  if ! read_state; then echo "kill switch не работает (нет $STATE): sudo systemctl status claude-killswitch"; exit 1; fi
+  printf 'Claude: %s\nIPv4: %s\nIPv6: %s\nпроверено: %s\n' "$state" "$ipv4" "$ipv6" "$checked"
+  [ "$state" = open ]; exit
+fi
+
+if ! systemctl is-active --quiet claude-killswitch 2>/dev/null || ! read_state; then
+  echo "✗ Claude Code не запущен: служба kill switch не работает (sudo systemctl start claude-killswitch)." >&2
+  exit 1
+fi
+if [ "$state" != open ]; then
+  echo "✗ Claude Code не запущен: нет проверенного VPN." >&2
+  echo "  IPv4: $ipv4" >&2
+  echo "  IPv6: $ipv6" >&2
+  echo "  Включи VPN и подожди несколько секунд (claude-guard --status)." >&2
+  exit 1
+fi
+
+real="$HOME/.local/bin/claude"
+[ -x "$real" ] || real=$(PATH="${PATH//\/usr\/local\/bin:/}" type -P claude)
+[ -n "$real" ] && [ -x "$real" ] || { echo "✗ Не найден Claude Code (~/.local/bin/claude)." >&2; exit 1; }
+exec "$real" "$@"

@@ -20,6 +20,7 @@ import (
 	"golang.org/x/sys/windows/svc"
 	"golang.org/x/sys/windows/svc/mgr"
 
+	"appguard/internal/exitsui"
 	"appguard/internal/paths"
 )
 
@@ -89,6 +90,9 @@ func (in *Installer) Install(src string) error {
 	}
 	if err := put(src, L.Binary); err != nil {
 		return fmt.Errorf("не удалось скопировать appguard: %w", err)
+	}
+	if err := os.WriteFile(L.ExitsUI, exitsui.Script, 0o644); err != nil {
+		return fmt.Errorf("не удалось положить окно «Мои VPN»: %w", err)
 	}
 	note, err := in.installCatalog(src)
 	if err != nil {

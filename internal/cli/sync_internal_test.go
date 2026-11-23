@@ -1,6 +1,9 @@
 package cli
 
-import "testing"
+import (
+	"os/exec"
+	"testing"
+)
 
 // Что отвечает git, когда доступа к репозиторию курса больше нет.
 func TestAccessDeniedIsRecognized(t *testing.T) {
@@ -19,5 +22,27 @@ func TestAccessDeniedIsRecognized(t *testing.T) {
 	}
 	if got := firstLine("fatal: unable to access 'x': Could not resolve host: github.com\nmore"); got != "unable to access 'x': Could not resolve host: github.com" {
 		t.Fatalf("%q", got)
+	}
+}
+
+// Внутренний проект без своего сервера: у ветки нет вышестоящей, а remote
+// upstream (исходный appguard) есть. Задача не ходит в сеть и ничего не тянет.
+func TestNoUpstreamBranchSyncsNothing(t *testing.T) {
+	git, err := gitPath()
+	if err != nil {
+		t.Skip("нет git")
+	}
+	dir := t.TempDir()
+	for _, args := range [][]string{
+		{"init", "-q", "-b", "main"},
+		{"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "--allow-empty", "-m", "x"},
+		{"remote", "add", "upstream", "https://invalid.invalid/appguard.git"},
+	} {
+		if out, err := exec.Command(git, append([]string{"-C", dir}, args...)...).CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v %s", args, err, out)
+		}
+	}
+	if p := pull(dir); p != "" {
+		t.Fatalf("без вышестоящей ветки обновлять нечего, а получено: %q", p)
 	}
 }

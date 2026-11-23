@@ -80,6 +80,7 @@ const (
 	menuTitle  = 1 // «Приложения в сети»: только для чтения
 	menuDetail = 2 // выход или причина: только для чтения
 	menuNotify = 3 // «Уведомления»
+	menuVPN    = 4 // «Мои VPN…»
 
 	smCxSmIcon = 49 // SM_CXSMICON: размер значка в области уведомлений
 	dibRGB     = 0
@@ -371,6 +372,10 @@ func (n *notifyIcon) menu() {
 	if v.Notify {
 		flags |= mfChecked
 	}
+	if OpenVPN != nil {
+		vpn := utf16Text(VPNItem + "\x00")
+		procAppendMenuW.Call(h, mfString, menuVPN, uintptr(unsafe.Pointer(&vpn[0])))
+	}
 	procAppendMenuW.Call(h, flags, menuNotify, uintptr(unsafe.Pointer(&item[0])))
 	var pt point
 	procGetCursorPos.Call(uintptr(unsafe.Pointer(&pt)))
@@ -380,8 +385,15 @@ func (n *notifyIcon) menu() {
 	r, _, _ := procTrackPopupMenu.Call(h, tpmReturnCmd|tpmNoNotify|tpmRightButton|tpmBottomAlign,
 		uintptr(pt.X), uintptr(pt.Y), 0, n.wnd, 0)
 	procPostMessageW.Call(n.wnd, wmNull, 0, 0)
-	if uint32(r) == menuNotify && n.toggle != nil {
-		n.toggle()
+	switch uint32(r) {
+	case menuNotify:
+		if n.toggle != nil {
+			n.toggle()
+		}
+	case menuVPN:
+		if OpenVPN != nil {
+			OpenVPN()
+		}
 	}
 }
 

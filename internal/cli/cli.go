@@ -90,6 +90,9 @@ func Run(args []string, env Env) int {
 	}
 	switch args[0] {
 	case "status":
+		if len(args) == 2 && args[1] == "--json" {
+			return statusJSON(env)
+		}
 		if len(args) > 1 {
 			return appDetail(env, strings.Join(args[1:], " "))
 		}
@@ -106,6 +109,8 @@ func Run(args []string, env Env) int {
 		return remember(env, args[1:])
 	case "forget":
 		return forget(env, args[1:])
+	case "vpn":
+		return vpnWindow(env)
 	case "notifications":
 		return notifications(env, args[1:])
 	case "check":
@@ -151,9 +156,11 @@ appguard без команды открывает меню: всё выбира�
   appguard rule [any|mine]             какое правило действует или сменить его
   appguard remember [имя] [адрес]      запомнить текущий выход VPN под именем; с адресом — без подключения
   appguard forget <выход>              убрать выход из моих — по имени или адресу
+  appguard vpn                         окно «Мои VPN»: добавить и удалить свои выходы (Windows)
   appguard forget <имя> <адрес>...     убрать у приложения адрес или домен, выученный по ошибке
   appguard notifications [on|off]      уведомления об открытии и закрытии сервисов (журнал пишется всегда)
   appguard status [приложение]         служба, правило, VPN и выход, приложения; с именем — что выучило приложение
+  appguard status --json               то же для программ: ответ службы как есть
   appguard check                       правила, выход, сервисы мимо VPN, «безопасный DNS» браузеров
   appguard log                         события в реальном времени (выход — Ctrl+C)
   appguard update [клон]               после git pull: пересобрать и поставить новую версию (с правами администратора)

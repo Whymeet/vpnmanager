@@ -84,14 +84,17 @@ func pull(clone string) string {
 	if _, err := run("rev-parse", "--is-inside-work-tree"); err != nil {
 		return "в " + clone + " больше нет клона git — он перемещён или удалён; переустанови appguard из нового места по setup/README.md"
 	}
+	// Внутренний проект: без вышестоящей ветки (свой сервер ещё не заведён)
+	// каталог берётся из клона как есть, в сеть задача не ходит. Чужие
+	// remote (upstream — исходный appguard) сами не подтягиваются никогда.
+	if _, err := run("rev-parse", "--verify", "--quiet", "@{u}"); err != nil {
+		return ""
+	}
 	if out, err := run("fetch", "--quiet"); err != nil {
 		if denied(out) {
 			return "доступ к репозиторию закрыт (" + firstLine(out) + ")"
 		}
 		return "не удалось связаться с репозиторием: " + firstLine(out)
-	}
-	if _, err := run("rev-parse", "--verify", "--quiet", "@{u}"); err != nil {
-		return "у текущей ветки клона нет вышестоящей ветки — обновлять не из чего"
 	}
 	out, err := run("merge", "--ff-only", "--quiet", "@{u}")
 	switch {

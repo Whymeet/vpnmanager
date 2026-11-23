@@ -56,6 +56,9 @@ function run(argv) {
       'toggle:': {types: ['void', ['id']], implementation: function (sender) {
         output.writeData($('toggle\n').dataUsingEncoding($.NSUTF8StringEncoding));
       }},
+      'vpn:': {types: ['void', ['id']], implementation: function (sender) {
+        output.writeData($('vpn\n').dataUsingEncoding($.NSUTF8StringEncoding));
+      }},
       'input:': {types: ['void', ['id']], implementation: function (note) {
         const data = note.userInfo.objectForKey($('NSFileHandleNotificationDataItem'));
         if (Number(data.length) === 0) $.exit(0); // appguard tray закрыл трубу; длина из моста — не число JS
@@ -106,6 +109,11 @@ function run(argv) {
   menu.addItem(headItem);
   menu.addItem($.NSMenuItem.separatorItem);
   menu.addItem(lineItem);
+  if (argv[1] === 'vpn') { // окно «Мои VPN»: обычный пункт, щелчок закрывает меню
+    const vpnItem = $.NSMenuItem.alloc.initWithTitleActionKeyEquivalent($('Мои VPN…'), 'vpn:', $(''));
+    vpnItem.target = target;
+    menu.addItem(vpnItem);
+  }
   item.menu = menu;
 
   function show(v) {
@@ -142,7 +150,11 @@ type statusItem struct {
 func System() (Icon, error) { return &statusItem{}, nil }
 
 func (s *statusItem) Show(v View, toggle func()) (<-chan error, error) {
-	cmd := exec.Command("/usr/bin/osascript", "-l", "JavaScript", "-e", script, line(v))
+	args := []string{"-l", "JavaScript", "-e", script, line(v)}
+	if OpenVPN != nil {
+		args = append(args, "vpn")
+	}
+	cmd := exec.Command("/usr/bin/osascript", args...)
 	var errOut bytes.Buffer
 	cmd.Stderr = &errOut
 	in, err := cmd.StdinPipe()
@@ -167,8 +179,13 @@ func (s *statusItem) Show(v View, toggle func()) (<-chan error, error) {
 		defer r.Close()
 		sc := bufio.NewScanner(r)
 		for sc.Scan() {
-			if sc.Text() == "toggle" {
+			switch sc.Text() {
+			case "toggle":
 				toggle()
+			case "vpn":
+				if OpenVPN != nil {
+					OpenVPN()
+				}
 			}
 		}
 	}()

@@ -1,0 +1,21 @@
+[Unit]
+Description=Kill switch: Claude only through VPN
+After=local-fs.target
+Before=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=notify
+NotifyAccess=all
+ExecStartPre=/usr/local/sbin/claude-killswitchd close
+ExecStart=/usr/local/sbin/claude-killswitchd run
+# Служба остановлена или упала — Claude остаётся закрытым.
+ExecStopPost=/usr/local/sbin/claude-killswitchd close
+Restart=always
+RestartSec=2
+WatchdogSec=60
+RuntimeDirectory=claude-killswitch
+RuntimeDirectoryPreserve=yes
+
+[Install]
+WantedBy=multi-user.target
