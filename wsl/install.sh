@@ -9,11 +9,41 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 systemctl is-system-running >/dev/null 2>&1 || [ "$(cat /proc/1/comm)" = systemd ] || {
   echo "В WSL выключен systemd: добавь в /etc/wsl.conf [boot] systemd=true и сделай wsl --shutdown." >&2; exit 1; }
 
+# Пакеты: сначала обычные источники с коротким ожиданием, не вышло — зеркало
+# (archive.ubuntu.com через некоторые VPN не отвечает, и apt висит без конца).
+MIRROR="${MIRROR:-http://mirror.yandex.ru/ubuntu/}"
+APT_OPTS=(-y -q -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15 -o Acquire::Retries=1)
+# Обычный источник отвечает за 8 с? Иначе apt висит минутами — сразу зеркало.
+archive_ok() {
+  local u
+  u=$(grep -rhoE '^(deb|URIs:) +https?://[^ ]+' /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null \
+      | grep -oE 'https?://[^ ]+' | grep -v launchpad | head -1)
+  [ -n "$u" ] && curl -fsS -o /dev/null -m 8 "${u%/}/dists/$(. /etc/os-release && echo "$VERSION_CODENAME")/Release"
+}
+# Без терминала и вопросов: под timeout apt, который тронет терминал
+# (debconf, dpkg), ядро останавливает (SIGTTOU) — установка «висит».
+export DEBIAN_FRONTEND=noninteractive
+apt_install() {
+  if archive_ok && timeout --foreground 120 apt-get install "${APT_OPTS[@]}" "$@" </dev/null >/dev/null 2>&1; then return 0; fi
+  echo "  обычный источник пакетов не отвечает — беру зеркало $MIRROR"
+  local list codename
+  codename=$(. /etc/os-release && echo "$VERSION_CODENAME")
+  list=$(mktemp)
+  printf 'deb %s %s main universe\ndeb %s %s-updates main universe\ndeb %s %s-security main universe\n' \
+    "$MIRROR" "$codename" "$MIRROR" "$codename" "$MIRROR" "$codename" >"$list"
+  local src=(-o Dir::Etc::sourcelist="$list" -o Dir::Etc::sourceparts=-)
+  timeout --foreground 180 apt-get update "${APT_OPTS[@]}" "${src[@]}" </dev/null >/dev/null 2>&1 || true
+  local rc=0
+  timeout --foreground 180 apt-get install "${APT_OPTS[@]}" "${src[@]}" "$@" </dev/null >/dev/null || rc=$?
+  rm -f "$list"
+  return $rc
+}
+
 if ! command -v nft >/dev/null; then
   echo "· ставлю nftables"
-  apt-get install -y nftables >/dev/null
+  apt_install nftables || { echo "Не удалось поставить nftables — проверь интернет и запусти ещё раз." >&2; exit 1; }
 fi
-command -v curl >/dev/null || apt-get install -y curl >/dev/null
+command -v curl >/dev/null || apt_install curl
 
 echo "· файлы"
 install -m 755 claude-killswitchd /usr/local/sbin/claude-killswitchd
