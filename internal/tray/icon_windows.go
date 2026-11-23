@@ -332,9 +332,30 @@ func (n *notifyIcon) createWindow() error {
 	return nil
 }
 
+// add ставит значок. Shell_NotifyIconW отвечает FALSE и тогда, когда Explorer
+// был занят и не ответил вовремя, а значок всё же встал: повторный NIM_ADD такого
+// значка не ставит, и без NIM_MODIFY значок навсегда остался бы с первой
+// картинкой (щит перечёркнут, хотя VPN давно проверен). Поэтому не встал —
+// пробуем изменить уже стоящий.
 func (n *notifyIcon) add() {
-	r, _, _ := procShellNotifyIconW.Call(nimAdd, uintptr(unsafe.Pointer(&n.data)))
+	if r, _, _ := procShellNotifyIconW.Call(nimAdd, uintptr(unsafe.Pointer(&n.data))); r != 0 {
+		n.added = true
+		return
+	}
+	r, _, _ := procShellNotifyIconW.Call(nimModify, uintptr(unsafe.Pointer(&n.data)))
 	n.added = r != 0
+}
+
+// show отдаёт значку текущий вид: стоит — меняет, не стоит — ставит. Не вышло —
+// повторит таймер.
+func (n *notifyIcon) show() {
+	if n.added {
+		if r, _, _ := procShellNotifyIconW.Call(nimModify, uintptr(unsafe.Pointer(&n.data))); r != 0 {
+			return
+		}
+		n.added = false
+	}
+	n.add()
 }
 
 // setView переносит вид в данные значка: картинку и подсказку. Значок, который
@@ -411,15 +432,14 @@ func windowProc(wnd, message, wParam, lParam uintptr) uintptr {
 			n.add()
 			return 0
 		case wmTimer:
-			if !n.added {
-				n.add()
-			}
+			// Раз в addRetry вид отдаётся заново: если Explorer пропустил
+			// изменение, значок не застрянет на старой картинке.
+			n.setView()
+			n.show()
 			return 0
 		case wmTrayView:
 			n.setView()
-			if n.added {
-				procShellNotifyIconW.Call(nimModify, uintptr(unsafe.Pointer(&n.data)))
-			}
+			n.show()
 			return 0
 		case wmTrayClick:
 			// Без NIM_SETVERSION Explorer шлёт само сообщение мыши в lParam.
