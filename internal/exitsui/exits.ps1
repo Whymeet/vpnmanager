@@ -9,8 +9,10 @@
 
 $principal = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
 if (-not $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
+  # Без -WindowStyle Hidden у Start-Process: SW_HIDE попал бы в STARTUPINFO, и
+  # первый ShowWindow процесса спрятал бы форму. Консоль прячет сам PowerShell.
   try {
-    Start-Process -FilePath 'powershell.exe' -Verb RunAs -WindowStyle Hidden -ErrorAction Stop -ArgumentList @(
+    Start-Process -FilePath 'powershell.exe' -Verb RunAs -ErrorAction Stop -ArgumentList @(
       '-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', "`"$PSCommandPath`"") | Out-Null
   } catch {}
   exit 0

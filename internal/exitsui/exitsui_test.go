@@ -17,3 +17,11 @@ func TestScript(t *testing.T) {
 		}
 	}
 }
+
+// Start-Process с -WindowStyle Hidden кладёт SW_HIDE в STARTUPINFO, и первый
+// ShowWindow процесса прячет форму: окно «Мои VPN» не появилось бы.
+func TestScriptWindowVisible(t *testing.T) {
+	if bytes.Contains(Script, []byte("-Verb RunAs -WindowStyle Hidden")) {
+		t.Error("exits.ps1 перезапускает себя со спрятанным окном — форма не появится")
+	}
+}

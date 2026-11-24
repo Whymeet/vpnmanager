@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"syscall"
+
+	"golang.org/x/sys/windows"
 )
 
 // vpnCommand — PowerShell с окном «Мои VPN» из папки программы. Окно само
@@ -13,8 +16,11 @@ func vpnCommand(env Env) (*exec.Cmd, error) {
 	if _, err := os.Stat(env.Layout.ExitsUI); err != nil {
 		return nil, fmt.Errorf("нет окна «Мои VPN» (%s) — переустанови appguard: install-windows.cmd в папке проекта", env.Layout.ExitsUI)
 	}
-	cmd := exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden", "-File", env.Layout.ExitsUI)
-	quiet(cmd)
+	cmd := exec.Command("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", env.Layout.ExitsUI)
+	// Консоли у PowerShell нет (CREATE_NO_WINDOW), но и SW_HIDE в STARTUPINFO
+	// (HideWindow, как у quiet) нельзя: первый ShowWindow процесса берёт режим
+	// оттуда, и форма окна осталась бы невидимой, а ShowDialog ждал бы вечно.
+	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.CREATE_NO_WINDOW}
 	return cmd, nil
 }
 
