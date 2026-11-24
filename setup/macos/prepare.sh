@@ -85,8 +85,16 @@ install_go() {
   local sum_var="GO_SHA256_$arch"
   GO_TMP="$(mktemp -d)"
   step "Go $need+ не найден — скачиваю Go $GO_VERSION (около 70 МБ) в $TOOLCHAIN: он нужен только для сборки, пароль не нужен"
-  curl -fL --retry 3 --progress-bar -o "$GO_TMP/go.tgz" "https://go.dev/dl/go${GO_VERSION}.darwin-${arch}.tar.gz" \
-    || fail "Не удалось скачать Go с go.dev. Проверь интернет (можно включить VPN) и запусти ещё раз."
+  # go.dev отдаёт файл с dl.google.com, а из России он часто не открывается —
+  # тогда зеркало. Подмену с зеркала ловит контрольная сумма ниже.
+  local file="go${GO_VERSION}.darwin-${arch}.tar.gz" url got="" errors=""
+  for url in "https://go.dev/dl/$file" "https://mirrors.aliyun.com/golang/$file"; do
+    if err="$(curl -fsSL --retry 3 -o "$GO_TMP/go.tgz" "$url" 2>&1)"; then got=1; break; fi
+    errors="$errors"$'\n'"    $url — ${err:-ошибка curl}"
+    step "Не скачалось с $url, пробую следующий адрес"
+  done
+  [ -n "$got" ] || fail "Не удалось скачать Go. Причины:$errors
+  Включи VPN в режиме полного туннеля и запусти установку ещё раз."
   echo "${!sum_var}  $GO_TMP/go.tgz" | shasum -a 256 -c - >/dev/null \
     || fail "Контрольная сумма Go не сошлась: файл повреждён или подменён. Ничего не установлено."
   step "Контрольная сумма сошлась, распаковываю"

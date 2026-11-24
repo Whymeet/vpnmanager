@@ -59,8 +59,11 @@ Claude Code (Windows и WSL) выходят в сеть **только** чер�
 git clone https://github.com/Whymeet/vpnmanager.git C:\vpnmanager
 ```
 
-Без Git: на странице репозитория **Code → Download ZIP**, распаковать в
-`C:\vpnmanager`.
+Без Git: на странице репозитория **Code → Download ZIP**, распаковать на диск
+`C:\` и переименовать получившуюся папку `vpnmanager-main` в `vpnmanager` —
+чтобы `install-windows.cmd` лежал прямо в `C:\vpnmanager` (а не в
+`C:\vpnmanager\vpnmanager-main`). Обновления из ZIP-копии не приходят: для них
+нужен `git clone`.
 
 > Папка должна лежать на обычном диске (`C:\…`), не на `\\wsl$\…`. После
 > установки её не переносить и не удалять: из неё идут обновления.

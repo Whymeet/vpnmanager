@@ -102,10 +102,25 @@ function InstallGo {
     $zip = Join-Path $tmp 'go.zip'
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
     $ProgressPreference = 'SilentlyContinue' # с полосой прогресса 5.1 качает в разы медленнее
-    try {
-      Invoke-WebRequest -UseBasicParsing -Uri "https://go.dev/dl/go$GoVersion.windows-$arch.zip" -OutFile $zip -ErrorAction Stop
-    } catch {
-      Fail 'Не удалось скачать Go с go.dev. Проверь интернет (можно включить VPN) и запусти ещё раз.'
+    # go.dev отдаёт файл с dl.google.com, а из России он часто не открывается —
+    # тогда зеркало. Подмену с зеркала ловит контрольная сумма ниже.
+    $file = "go$GoVersion.windows-$arch.zip"
+    $urls = @("https://go.dev/dl/$file", "https://mirrors.aliyun.com/golang/$file")
+    $errors = @()
+    $got = $false
+    foreach ($url in $urls) {
+      try {
+        Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $zip -ErrorAction Stop
+        $got = $true
+        break
+      } catch {
+        $errors += "    $url — $($_.Exception.Message)"
+        Step "Не скачалось с $url, пробую следующий адрес"
+        Remove-Item -Force $zip -ErrorAction SilentlyContinue
+      }
+    }
+    if (-not $got) {
+      Fail ("Не удалось скачать Go. Причины:`n" + ($errors -join "`n") + "`n  Включи VPN в режиме TUN (полный туннель, не «системный прокси») и запусти установку ещё раз.")
     }
     if ((Get-FileHash -Algorithm SHA256 -Path $zip).Hash.ToLower() -ne $GoSha256[$arch]) {
       Fail 'Контрольная сумма Go не сошлась: файл повреждён или подменён. Ничего не установлено.'
