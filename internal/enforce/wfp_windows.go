@@ -642,7 +642,18 @@ func (w *WFP) load() (wfpState, error) {
 		return state, err
 	}
 	if err := json.Unmarshal(data, &state); err != nil {
-		return state, fmt.Errorf("%s: %w", w.StateFile, err)
+		// Файл испорчен (сбой системы посреди записи оставляет нули). Без
+		// этого apply отказывал бы навсегда. Начать с пустого безопасно:
+		// фильтры ставятся заново поверх тех же (ruleID — хэш смысла), а
+		// испорченный файл остаётся рядом для разбора.
+		bad := w.StateFile + ".bad"
+		if rerr := os.Rename(w.StateFile, bad); rerr != nil {
+			return state, fmt.Errorf("%s: %w (отложить не удалось: %v)", w.StateFile, err, rerr)
+		}
+		if w.Logf != nil {
+			w.Logf("WFP: %s испорчен (%v), отложен в %s — фильтры ставятся заново", w.StateFile, err, bad)
+		}
+		return wfpState{Apps: map[string][]string{}}, nil
 	}
 	if state.Apps == nil {
 		state.Apps = map[string][]string{}
@@ -655,8 +666,22 @@ func (w *WFP) save(state wfpState) error {
 	if err != nil {
 		return err
 	}
+	// Sync до переименования: иначе при сбое системы NTFS сохраняет
+	// переименование раньше данных и файл оказывается из нулей.
 	tmp := w.StateFile + ".new"
-	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+	f, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(data)
+	if err == nil {
+		err = f.Sync()
+	}
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		os.Remove(tmp)
 		return err
 	}
 	return os.Rename(tmp, w.StateFile)
