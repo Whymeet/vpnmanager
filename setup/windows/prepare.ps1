@@ -126,13 +126,27 @@ function InstallGo {
       Fail 'Контрольная сумма Go не сошлась: файл повреждён или подменён. Ничего не установлено.'
     }
     Step 'Контрольная сумма сошлась, распаковываю'
-    # tar.exe есть в Windows 10 с 1803 и распаковывает zip в разы быстрее Expand-Archive.
+    # tar.exe есть в Windows 10 с 1803 и распаковывает zip в разы быстрее .NET.
+    # Но в части сборок Windows 11 он не читает имена файлов не из ASCII
+    # («Archive entry has empty or unreadable filename») — тогда .NET ZipFile:
+    # имена в UTF-8 он понимает. Expand-Archive не берём: с ним 5.1 в разы
+    # медленнее из-за полосы прогресса.
+    $unpacked = $false
     $tar = Join-Path $env:SystemRoot 'System32\tar.exe'
     if (Test-Path $tar) {
-      & $tar -xf $zip -C $tmp
-      if ($LASTEXITCODE -ne 0) { Fail 'Не удалось распаковать Go.' }
-    } else {
-      try { Expand-Archive -Path $zip -DestinationPath $tmp -ErrorAction Stop } catch { Fail "Не удалось распаковать Go: $_" }
+      & $tar -xf $zip -C $tmp 2>$null
+      if ($LASTEXITCODE -eq 0) {
+        $unpacked = $true
+      } else {
+        Step 'tar.exe не справился, распаковываю средствами .NET (это чуть дольше)'
+        Remove-Item -Recurse -Force (Join-Path $tmp 'go') -ErrorAction SilentlyContinue
+      }
+    }
+    if (-not $unpacked) {
+      try {
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [IO.Compression.ZipFile]::ExtractToDirectory($zip, $tmp)
+      } catch { Fail "Не удалось распаковать Go: $($_.Exception.Message)" }
     }
     New-Item -ItemType Directory -Force -Path $Toolchain | Out-Null
     $dst = Join-Path $Toolchain 'go'
