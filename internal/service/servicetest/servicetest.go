@@ -655,6 +655,8 @@ type Fakes struct {
 	NotifyAfter time.Duration
 	// ReadApp — как служба узнаёт приложение по пути; по умолчанию — пакет .app.
 	ReadApp func(path string) (apps.App, error)
+	// ResolverDown — запросы к резолверу службы по петле режет чужой файрвол.
+	ResolverDown *atomic.Bool
 }
 
 // Service — запущенная тестовая служба.
@@ -704,6 +706,9 @@ func Start(t *testing.T, root string, f Fakes) *Service {
 	}
 	if f.RussianDNS == nil {
 		f.RussianDNS = NewDNS("Яндекс")
+	}
+	if f.ResolverDown == nil {
+		f.ResolverDown = new(atomic.Bool)
 	}
 	if f.SystemDNS == nil {
 		f.SystemDNS = &SystemDNS{}
@@ -763,8 +768,10 @@ func launch(L paths.Layout, f Fakes) *Service {
 			Apps: f.Apps, Answers: f.Answers, ReadApp: f.ReadApp, ScanEvery: ScanEvery, LearnFor: LearnFor, RemindEvery: RemindEvery,
 			PhysicalAddr: func() (netip.Addr, bool) { return PhysicalAddr, true },
 			CheckEvery:   CheckEvery, ProbeEvery: CheckEvery, GuardEvery: GuardEvery, Now: time.Now, NotifyAfter: f.NotifyAfter,
-			Physical: func() (core.Tunnel, bool) { return PhysicalIface, true },
-			Logf:     func(string, ...any) {},
+			ResolverUp:    func(context.Context) bool { return !f.ResolverDown.Load() },
+			ResolverEvery: CheckEvery,
+			Physical:      func() (core.Tunnel, bool) { return PhysicalIface, true },
+			Logf:          func(string, ...any) {},
 		})
 	}()
 	go func() {

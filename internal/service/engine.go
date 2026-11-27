@@ -37,7 +37,8 @@ type engine struct {
 
 	cfg    configStore
 	lookup func(ctx context.Context, domain string) ([]netip.Addr, error)
-	// dnsAddr — где слушает резолвер службы: пункт проверки спрашивает его.
+	// dnsAddr — где слушает резолвер службы: его спрашивают проверка и
+	// resolverLoop.
 	dnsAddr netip.AddrPort
 
 	// applyMu держит reapply целиком: правила, вычисленные позже, и применяются
@@ -61,7 +62,10 @@ type engine struct {
 	haveRules bool
 	failed    string // ошибка последнего применения; пусто — применено
 	dnsFailed bool   // домены не направились на службу: повторяет retryFailed
-	cleared   bool   // правила сняты удалением: больше их не ставить
+	// dnsBypass — резолвер службы недоступен по петле (его режет чужой
+	// файрвол): защищённые домены временно не направлены на службу.
+	dnsBypass bool
+	cleared   bool // правила сняты удалением: больше их не ставить
 	// servers — серверы VPN: к ним клиент ходил мимо туннеля при проверенном
 	// выходе. Сервер на адресе защищённого сервиса разрешён на физическом
 	// интерфейсе.
@@ -156,6 +160,7 @@ func (e *engine) run(ctx context.Context) {
 	defer wg.Wait()
 	wg.Go(func() { e.learnLoop(ctx) })
 	wg.Go(func() { e.listenLoop(ctx) })
+	wg.Go(func() { e.resolverLoop(ctx) })
 	tick := time.NewTicker(e.d.CheckEvery)
 	defer tick.Stop()
 	prune := time.NewTicker(time.Hour)
@@ -878,7 +883,14 @@ func (e *engine) match(name string) (string, bool) {
 // которого в системе уже есть чужой резолвер, журналится: его имена мимо
 // службы, и новые адреса не попадут в таблицы.
 func (e *engine) syncDNS() {
-	skipped, err := e.d.SystemDNS.Set(e.protectedList())
+	e.mu.Lock()
+	bypass := e.dnsBypass
+	e.mu.Unlock()
+	domains := e.protectedList()
+	if bypass {
+		domains = nil
+	}
+	skipped, err := e.d.SystemDNS.Set(domains)
 	e.mu.Lock()
 	again := e.dnsFailed
 	e.dnsFailed = err != nil

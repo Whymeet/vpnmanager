@@ -27,9 +27,6 @@ var (
 	procFilterAdd            = fwpuclnt.NewProc("FwpmFilterAdd0")
 	procFilterDeleteByKey    = fwpuclnt.NewProc("FwpmFilterDeleteByKey0")
 	procFilterGetByKey       = fwpuclnt.NewProc("FwpmFilterGetByKey0")
-	procFilterCreateEnum     = fwpuclnt.NewProc("FwpmFilterCreateEnumHandle0")
-	procFilterEnum           = fwpuclnt.NewProc("FwpmFilterEnum0")
-	procFilterDestroyEnum    = fwpuclnt.NewProc("FwpmFilterDestroyEnumHandle0")
 	procGetAppIDFromFileName = fwpuclnt.NewProc("FwpmGetAppIdFromFileName0")
 	procFreeMemory           = fwpuclnt.NewProc("FwpmFreeMemory0")
 
@@ -66,12 +63,12 @@ const (
 	sublayerFlagPersistent  = 0x1
 	filterFlagPersistent    = 0x1
 	filterFlagBootTime      = 0x2
+	filterFlagClearAction   = 0x8 // FWPM_FILTER_FLAG_CLEAR_ACTION_RIGHT: жёсткое действие
 	conditionFlagIsLoopback = 0x1
 
 	dataUint8       = 1
 	dataUint16      = 2
 	dataUint32      = 3
-	dataUint64      = 4
 	dataByteArray16 = 11
 	dataByteBlob    = 12
 	dataSID         = 13
@@ -157,19 +154,6 @@ type fwpmFilter0 struct {
 	effectiveWeight     fwpValue0
 }
 
-// fwpmFilterEnumTemplate0 — отбор фильтров при переборе (FWPM_FILTER_ENUM_TEMPLATE0).
-type fwpmFilterEnumTemplate0 struct {
-	providerKey             *windows.GUID
-	layerKey                windows.GUID
-	enumType                uint32
-	flags                   uint32
-	providerContextTemplate uintptr
-	numFilterConditions     uint32
-	filterCondition         *fwpmFilterCondition0
-	actionMask              uint32
-	calloutKey              *windows.GUID
-}
-
 // Размеры структур на 64-битной Windows: разойдутся с fwpmtypes.h — не соберётся.
 var (
 	_ [unsafe.Sizeof(fwpmSession0{}) - 72]byte
@@ -186,8 +170,6 @@ var (
 	_ [128 - unsafe.Offsetof(fwpmFilter0{}.action)]byte
 	_ [unsafe.Offsetof(fwpmFilter0{}.providerContextKey) - 152]byte
 	_ [152 - unsafe.Offsetof(fwpmFilter0{}.providerContextKey)]byte
-	_ [unsafe.Sizeof(fwpmFilterEnumTemplate0{}) - 72]byte
-	_ [72 - unsafe.Sizeof(fwpmFilterEnumTemplate0{})]byte
 )
 
 // result — код возврата функции WFP: 0 — успех, иначе FWP_E_* или ошибка Win32.
@@ -257,76 +239,6 @@ func (e *fwpEngine) hasSublayer(id windows.GUID) (bool, error) {
 	return e.found(result(r), unsafe.Pointer(&sl), fwpSublayerNotFound)
 }
 
-// sublayerName — имя подуровня для людей; не узнать — его идентификатор.
-func (e *fwpEngine) sublayerName(id windows.GUID) string {
-	var sl *fwpmSublayer0
-	r, _, _ := procSubLayerGetByKey.Call(uintptr(e.h), uintptr(unsafe.Pointer(&id)), uintptr(unsafe.Pointer(&sl)))
-	if result(r) != nil || sl == nil {
-		return id.String()
-	}
-	defer procFreeMemory.Call(uintptr(unsafe.Pointer(&sl)))
-	if sl.displayData.name == nil {
-		return id.String()
-	}
-	return windows.UTF16PtrToString(sl.displayData.name)
-}
-
-// shownFilter — то, что исполнителю нужно знать о чужом фильтре.
-type shownFilter struct {
-	sublayer windows.GUID
-	block    bool
-	weight   uint64 // итоговый вес (effectiveWeight)
-	// onlyPort — единственное условие фильтра: удалённый порт, равный этому;
-	// 0 — условия другие.
-	onlyPort uint16
-}
-
-// filters — все фильтры уровня layer.
-func (e *fwpEngine) filters(layer windows.GUID) ([]shownFilter, error) {
-	tmpl := &fwpmFilterEnumTemplate0{layerKey: layer, enumType: 1 /* FWP_FILTER_ENUM_OVERLAPPING */, actionMask: 0xffffffff}
-	var enum windows.Handle
-	r, _, _ := procFilterCreateEnum.Call(uintptr(e.h), uintptr(unsafe.Pointer(tmpl)), uintptr(unsafe.Pointer(&enum)))
-	runtime.KeepAlive(tmpl)
-	if err := result(r); err != nil {
-		return nil, err
-	}
-	defer procFilterDestroyEnum.Call(uintptr(e.h), uintptr(enum))
-	var out []shownFilter
-	for {
-		var entries **fwpmFilter0
-		var n uint32
-		r, _, _ := procFilterEnum.Call(uintptr(e.h), uintptr(enum), 256, uintptr(unsafe.Pointer(&entries)), uintptr(unsafe.Pointer(&n)))
-		if err := result(r); err != nil {
-			return nil, err
-		}
-		if n == 0 || entries == nil {
-			return out, nil
-		}
-		for _, f := range unsafe.Slice(entries, n) {
-			out = append(out, shown(f))
-		}
-		procFreeMemory.Call(uintptr(unsafe.Pointer(&entries)))
-		if n < 256 {
-			return out, nil
-		}
-	}
-}
-
-func shown(f *fwpmFilter0) shownFilter {
-	s := shownFilter{sublayer: f.subLayerKey, block: f.action.typ == actionBlock}
-	// UINT64 в объединении FWP_VALUE0 — указатель на число (память WFP).
-	if p := *(**uint64)(unsafe.Pointer(&f.effectiveWeight.value)); f.effectiveWeight.typ == dataUint64 && p != nil {
-		s.weight = *p
-	}
-	if f.numFilterConditions == 1 && f.filterCondition != nil {
-		c := f.filterCondition
-		if c.fieldKey == conditionRemotePort && c.matchType == matchEqual && c.conditionValue.typ == dataUint16 {
-			s.onlyPort = uint16(c.conditionValue.value)
-		}
-	}
-	return s
-}
-
 // hasFilter — фильтр на месте; не найден — false без ошибки.
 func (e *fwpEngine) hasFilter(id windows.GUID) (bool, error) {
 	var f *fwpmFilter0
@@ -350,9 +262,9 @@ type fwFilter struct {
 	id, layer, sublayer, provider windows.GUID // нулевые sublayer и provider — подуровень по умолчанию, без поставщика
 	name                          string
 	weight                        uint8
-	weight64                      uint64 // точный вес, если не 0: вместо weight
 	permit                        bool
 	persistent, boot              bool
+	hard                          bool // жёсткое: нижние подуровни его не переиграют
 	appID                         []byte         // ALE_APP_ID == appID, если задан
 	sid                           []byte         // ALE_PACKAGE_ID == sid (пакет Store), если задан
 	local                         netip.Addr     // IP_LOCAL_ADDRESS == local, если задан
@@ -373,7 +285,6 @@ type filterMem struct {
 	app, sid []byte
 	name     *uint16
 	prov     windows.GUID
-	weight64 uint64
 }
 
 func (e *fwpEngine) addFilter(f fwFilter) error {
@@ -421,10 +332,6 @@ func (e *fwpEngine) addFilter(f fwFilter) error {
 		numFilterConditions: uint32(n),
 		action:              fwpmAction0{typ: actionBlock},
 	}
-	if f.weight64 != 0 {
-		m.weight64 = f.weight64
-		m.filter.weight = fwpValue0{typ: dataUint64, value: uintptr(unsafe.Pointer(&m.weight64))}
-	}
 	if n > 0 {
 		m.filter.filterCondition = &m.conds[0]
 	}
@@ -440,6 +347,9 @@ func (e *fwpEngine) addFilter(f fwFilter) error {
 	}
 	if f.boot {
 		m.filter.flags |= filterFlagBootTime
+	}
+	if f.hard {
+		m.filter.flags |= filterFlagClearAction
 	}
 	var id uint64
 	r, _, _ := procFilterAdd.Call(uintptr(e.h), uintptr(unsafe.Pointer(&m.filter)), 0, uintptr(unsafe.Pointer(&id)))

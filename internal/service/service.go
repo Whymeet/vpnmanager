@@ -79,6 +79,10 @@ type Deps struct {
 	NotifyAfter  time.Duration                       // сколько закрытие длится, прежде чем о нём уведомить
 	ProbeEvery   time.Duration                       // как часто проверять «Россию напрямую» без событий сети
 	GuardEvery   time.Duration                       // как часто сторож сверяет правила файрвола
+	// ResolverUp — доходят ли запросы до резолвера службы по петле; nil —
+	// спросить его самого. ResolverEvery — как часто спрашивать (0 — раз в 3 с).
+	ResolverUp    func(ctx context.Context) bool
+	ResolverEvery time.Duration
 	// Physical — физический интерфейс сейчас: через него зонд узнаёт домашний адрес.
 	Physical func() (core.Tunnel, bool)
 	// Ready вызывается один раз, когда поставлены первые правила: systemd ждёт

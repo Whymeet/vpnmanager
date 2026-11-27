@@ -109,28 +109,42 @@ func (e *engine) checkExit() []ipc.CheckItem {
 }
 
 // checkResolver — доходят ли запросы до резолвера службы: туда система шлёт
-// имена защищённых доменов. Спрашивает сама служба по петле, как и система, и
-// запросом без вопроса: резолвер отвечает на него сразу (FORMERR), не ходя в
-// сеть, — любой ответ значит, что дорога открыта.
+// имена защищённых доменов.
 func (e *engine) checkResolver(ctx context.Context) ipc.CheckItem {
 	it := ipc.CheckItem{Name: "Резолвер"}
 	if !e.dnsAddr.IsValid() {
 		it.Result, it.Detail = ipc.CheckWarn, "адрес резолвера службы неизвестен"
 		return it
 	}
-	ctx, cancel := context.WithTimeout(ctx, reachTimeout)
+	if e.resolverAnswers(ctx, reachTimeout) {
+		it.Result, it.Detail = ipc.CheckOK, "отвечает на "+e.dnsAddr.String()
+		return it
+	}
+	e.mu.Lock()
+	bypass := e.dnsBypass
+	e.mu.Unlock()
+	it.Hint = "запросы на порт 53 режет файрвол — так защищается от утечек DNS клиент VPN на sing-box (v2RayTun, Hiddify, NekoBox) в режиме туннеля"
+	if bypass {
+		it.Result = ipc.CheckWarn
+		it.Detail = fmt.Sprintf("на %s не отвечает — имена защищённых доменов пока разрешает DNS системы (у такого клиента VPN — через туннель)", e.dnsAddr)
+		return it
+	}
+	it.Result = ipc.CheckFail
+	it.Detail = fmt.Sprintf("на %s не отвечает — имена защищённых доменов не разрешаются, сервисы не откроются и через VPN", e.dnsAddr)
+	return it
+}
+
+// resolverAnswers спрашивает резолвер службы по петле, как его спрашивает
+// система, запросом без вопроса: на него резолвер отвечает сразу (FORMERR), не
+// ходя в сеть, — любой ответ значит, что дорога открыта.
+func (e *engine) resolverAnswers(ctx context.Context, timeout time.Duration) bool {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	q := new(dns.Msg)
 	q.Id = dns.Id()
-	c := &dns.Client{Net: "udp", Timeout: reachTimeout}
-	if _, _, err := c.ExchangeContext(ctx, q, e.dnsAddr.String()); err != nil {
-		it.Result = ipc.CheckFail
-		it.Detail = fmt.Sprintf("на %s не отвечает — имена защищённых доменов не разрешаются, сервисы не откроются и через VPN", e.dnsAddr)
-		it.Hint = "запросы на порт 53 режет файрвол — часто клиент VPN с защитой от утечек DNS; что с ним, видно в appguard log"
-		return it
-	}
-	it.Result, it.Detail = ipc.CheckOK, "отвечает на "+e.dnsAddr.String()
-	return it
+	c := &dns.Client{Net: "udp", Timeout: timeout}
+	_, _, err := c.ExchangeContext(ctx, q, e.dnsAddr.String())
+	return err == nil
 }
 
 // target — защищённый сервис для проверки: имя и его адреса.

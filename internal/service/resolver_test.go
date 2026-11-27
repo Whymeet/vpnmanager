@@ -173,3 +173,30 @@ func TestProtectRejectsWhatIsNotADomain(t *testing.T) {
 		t.Fatalf("на службу направлены %v", got)
 	}
 }
+
+// Запросы к резолверу службы по петле режет чужой файрвол (клиент VPN с
+// защитой от утечек DNS): защищённые домены снимаются с системы — имена
+// разрешает её DNS, а не никто. Резолвер вернулся — домены снова на службе.
+func TestBlockedResolverHandsDomainsToSystemDNS(t *testing.T) {
+	s := withResolver(t)
+	waitDomains := func(want []string) {
+		t.Helper()
+		deadline := time.Now().Add(2 * time.Second)
+		for !slices.Equal(s.SystemDNS.Domains(), want) {
+			if time.Now().After(deadline) {
+				t.Fatalf("на резолвер службы направлены %v, ждали %v", s.SystemDNS.Domains(), want)
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+	}
+	waitDomains([]string{domain})
+
+	s.ResolverDown.Store(true)
+	waitDomains(nil)
+	hasLine(t, s, "резолвер службы не отвечает")
+	waitRules(t, s, time.Second, func(r enforce.Rules) bool { return inTables(r, notion4.String()) }) // адреса в таблицах остаются
+
+	s.ResolverDown.Store(false)
+	waitDomains([]string{domain})
+	hasLine(t, s, "резолвер службы снова отвечает")
+}

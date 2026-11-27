@@ -50,6 +50,7 @@ const (
 	weightBlock      = 6
 	weightPermit     = 10
 	weightProxyBlock = 12
+	weightResolver   = 15
 )
 
 // Пределы раскрытия папки установки: глубже и больше программ в папках
@@ -109,10 +110,6 @@ type WFP struct {
 	changed  chan struct{}
 	said     map[string]bool // о чём уже сказано в Logf
 	rescanOn sync.Once
-	// dnsOpen — разрешения петле на порт 53 в чужих подуровнях (guardDNS):
-	// идентификатор фильтра в динамической сессии → его подуровень.
-	dnsOpen map[windows.GUID]windows.GUID
-	dnsOnce sync.Once
 }
 
 // subject — то, на что ставится фильтр: исполняемый файл или пакет Store.
@@ -149,7 +146,7 @@ func (w *WFP) Apply(r Rules) error {
 func (w *WFP) reset() {
 	if w.dynamic != nil {
 		w.dynamic.close()
-		w.dynamic, w.dyn, w.dnsOpen = nil, nil, nil
+		w.dynamic, w.dyn = nil, nil
 	}
 	if w.persist != nil {
 		w.persist.close()
@@ -212,12 +209,7 @@ func (w *WFP) apply(r Rules) (appErrs []error, err error) {
 		return nil, err
 	}
 	w.watch(targets)
-	if err := w.permit(all, r); err != nil {
-		return nil, err
-	}
-	w.guardDNS()
-	w.dnsOnce.Do(func() { go w.dnsLoop() })
-	return appErrs, nil
+	return appErrs, w.permit(all, r)
 }
 
 // blockAddrs ставит постоянные запреты на адреса защищённых сервисов и
@@ -273,6 +265,18 @@ func (w *WFP) permit(subs []subject, r Rules) error {
 	for _, l := range aleLayers {
 		add(fwFilter{id: ruleID("loopback", l.name), layer: l.id, sublayer: sublayerID, provider: providerID,
 			name: "appguard: петля", weight: weightPermit, permit: true, loopback: true})
+		// Резолвер службы на петле — жёстким разрешением: клиенты VPN на
+		// sing-box (v2RayTun, Hiddify) ставят свой подуровень того же веса с
+		// запретом всем на порт 53 мимо их туннеля. Если Windows смотрит
+		// подуровень appguard раньше, жёсткое разрешение обычный запрет ниже
+		// не переиграет; если позже — запрет окончательный, и резолвер
+		// выручает служба: недоступен — имена идут через DNS системы
+		// (engine.resolverLoop).
+		if l.connect {
+			add(fwFilter{id: ruleID("resolver", l.name), layer: l.id, sublayer: sublayerID, provider: providerID,
+				name: "appguard: резолвер на петле", weight: weightResolver, permit: true, hard: true, loopback: true,
+				remote: netip.AddrPortFrom(netip.Addr{}, 53)})
+		}
 		for _, a := range r.OpenAddrs {
 			if l.v6 == a.Is6() {
 				add(fwFilter{id: ruleID("tunnel", a.String(), l.name), layer: l.id, sublayer: sublayerID, provider: providerID,
@@ -325,92 +329,6 @@ func (w *WFP) permit(subs []subject, r Rules) error {
 		w.dyn[id] = true
 	}
 	return nil
-}
-
-// dnsGuardEvery — как часто искать чужие запреты DNS: клиент VPN ставит их
-// заново при каждом подключении, и до следующего прохода имена защищённых
-// доменов не разрешаются.
-const dnsGuardEvery = 2 * time.Second
-
-func (w *WFP) dnsLoop() {
-	tick := time.NewTicker(dnsGuardEvery)
-	defer tick.Stop()
-	for range tick.C {
-		w.mu.Lock()
-		if w.dynamic != nil && !w.cleared {
-			w.guardDNS()
-		}
-		w.mu.Unlock()
-	}
-}
-
-// guardDNS открывает резолверу службы дорогу через чужие запреты DNS.
-//
-// Клиенты VPN на sing-box (v2RayTun, Hiddify, NekoBox) в режиме туннеля ставят
-// свой подуровень с наибольшим весом и в нём запрет всем соединениям на порт
-// 53, кроме идущих через их туннель, — защиту от утечек DNS. Под него попадает
-// и петля: Windows шлёт имена защищённых доменов резолверу службы на
-// 127.53.53.53:53 (NRPT), запрос режется, и сервисы не открываются даже через
-// проверенный VPN. Подуровень appguard того же веса, а порядок подуровней
-// равного веса Windows не обещает, поэтому разрешение кладётся в сам чужой
-// подуровень — с весом выше его запрета: внутри подуровня побеждает больший.
-// Разрешено только соединение с петлёй на порт 53 — мимо туннеля DNS
-// по-прежнему закрыт. Фильтр в динамической сессии службы: она завершилась —
-// Windows его сняла; пропал чужой запрет — фильтр снимается здесь.
-//
-// Чужой фильтр — запрет, у которого единственное условие «удалённый порт 53»:
-// у запретов с другими условиями (программа, пользователь) другой смысл.
-func (w *WFP) guardDNS() {
-	if w.dnsOpen == nil {
-		w.dnsOpen = map[windows.GUID]windows.GUID{}
-	}
-	want := map[windows.GUID]fwFilter{}
-	for _, l := range aleLayers[:2] {
-		list, err := w.dynamic.filters(l.id)
-		if err != nil {
-			w.logOnce("dns-enum", "WFP: не удалось перебрать фильтры (чужие запреты DNS не проверены): %v", err)
-			return
-		}
-		top := map[windows.GUID]uint64{} // подуровень → наибольший вес его запрета на порт 53
-		for _, f := range list {
-			if f.block && f.onlyPort == 53 && f.sublayer != sublayerID && f.sublayer != (windows.GUID{}) {
-				top[f.sublayer] = max(top[f.sublayer], f.weight)
-			}
-		}
-		for sl, weight := range top {
-			if weight == ^uint64(0) {
-				w.logOnce("dns-max "+sl.String(), "WFP: запрет DNS в подуровне «%s» с наибольшим весом — перебить нечем, резолвер appguard может не отвечать", w.dynamic.sublayerName(sl))
-				continue
-			}
-			f := fwFilter{id: ruleID("dns-loopback", sl.String(), l.name), layer: l.id, sublayer: sl, provider: providerID,
-				name: "appguard: резолвер на петле", weight64: weight + 1, permit: true, loopback: true,
-				remote: netip.AddrPortFrom(netip.Addr{}, 53)}
-			want[f.id] = f
-		}
-	}
-	for id := range w.dnsOpen {
-		if _, ok := want[id]; ok {
-			continue
-		}
-		if err := w.dynamic.deleteFilter(id); err != nil && !errors.Is(err, fwpFilterNotFound) {
-			w.logOnce("dns-del "+id.String(), "WFP: не удалось снять разрешение резолверу: %v", err)
-			continue
-		}
-		delete(w.dnsOpen, id)
-	}
-	for id, f := range want {
-		if _, ok := w.dnsOpen[id]; ok {
-			continue
-		}
-		if err := w.dynamic.addFilter(f); err != nil && !errors.Is(err, fwpAlreadyExists) {
-			w.logOnce("dns-add "+f.sublayer.String(), "WFP: подуровень «%s» запрещает DNS на порт 53, а разрешение резолверу appguard в него не встало — имена защищённых доменов не разрешаются: %v",
-				w.dynamic.sublayerName(f.sublayer), err)
-			continue
-		}
-		w.dnsOpen[id] = f.sublayer
-		w.logOnce("dns-ok "+f.sublayer.String(), "WFP: подуровень «%s» запрещает DNS на порт 53 (защита клиента VPN от утечек) — резолверу appguard на петле разрешено",
-			w.dynamic.sublayerName(f.sublayer))
-	}
 }
 
 // block ставит программе постоянные и загрузочные запреты. Загрузочные — сверх
@@ -594,12 +512,6 @@ func (w *WFP) Clear() error {
 			}
 		}
 		w.dyn = map[windows.GUID]bool{}
-		for id := range w.dnsOpen {
-			if err := w.dynamic.deleteFilter(id); err != nil && !errors.Is(err, fwpFilterNotFound) {
-				errs = append(errs, err)
-			}
-		}
-		w.dnsOpen = nil
 	}
 	state, err := w.load()
 	if err != nil {

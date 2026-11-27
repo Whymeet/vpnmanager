@@ -485,14 +485,14 @@ appguard rule mine                       # только через мои вых
   установка говорила, что будет после следующего входа; на GNOME проверь расширение
   (`gnome-extensions list --enabled`).
 - **Windows: VPN проверен, щит с замком, а Claude не грузится** (остальные сайты
-  открываются) — в `appguard check` пункт «Резолвер» не отвечает:
-  `Resolve-DnsName claude.ai` ждёт и падает по времени. Запросы к резолверу
-  appguard режет клиент VPN — защита от утечек DNS (v2RayTun, Hiddify, NekoBox в
-  режиме туннеля). Начиная с этой версии appguard открывает себе дорогу сам —
-  обнови appguard (`git pull`, затем `install-windows.cmd`) и переподключи VPN;
-  в `appguard log` появится «подуровень … запрещает DNS на порт 53 — резолверу
-  appguard на петле разрешено». Не помогло — пришли человеку вывод `appguard
-  check` и `appguard log`.
+  открываются), `Resolve-DnsName claude.ai` падает по времени — запросы к
+  резолверу appguard режет клиент VPN: защита от утечек DNS у v2RayTun, Hiddify,
+  NekoBox в режиме туннеля. Обнови appguard (`git pull`, затем
+  `install-windows.cmd`): служба сама замечает это за несколько секунд и
+  временно отдаёт имена Claude DNS самого клиента VPN — в `appguard log` строка
+  «резолвер службы не отвечает…», в `appguard check` пункт «Резолвер» с «!».
+  Если и после этого `Resolve-DnsName claude.ai` не отвечает — пришли человеку
+  вывод `appguard check` и `appguard log`.
 - **Windows: «appguard не распознано как имя командлета»** — открой новое окно
   PowerShell: в окнах, открытых до установки, команды нет.
 - **Windows: «Менять настройки appguard можно только из PowerShell, открытого от
