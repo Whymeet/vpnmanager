@@ -160,6 +160,7 @@ func Run(ctx context.Context, d Deps) error {
 		return fmt.Errorf("резолвер %s: %w", d.DNSAddr, err)
 	}
 	defer dnsSrv.Stop()
+	eng.dnsAddr = dnsSrv.Addr()
 	s := &service{d: d, started: d.Now(), cancel: cancel, ctx: ctx, journal: j, engine: eng}
 	// Метка «работаю» лежит, пока служба работает. Осталась от прошлого
 	// запуска — тот оборвался (принудительно завершён, упал, выключилось

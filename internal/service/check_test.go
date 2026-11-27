@@ -50,6 +50,9 @@ func TestCheckPassesWhenProtectionHolds(t *testing.T) {
 			t.Fatalf("%s: %+v", name, it)
 		}
 	}
+	if it := items["Резолвер"]; it.Result != ipc.CheckOK || it.Detail != "отвечает на "+s.DNSAddr {
+		t.Fatalf("резолвер: %+v", it)
+	}
 }
 
 // Правила сброшены и не возвращаются: провалены ровно правила и сервис,

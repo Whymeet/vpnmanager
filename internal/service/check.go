@@ -11,6 +11,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/miekg/dns"
+
 	"appguard/internal/core"
 	"appguard/internal/ipc"
 )
@@ -28,6 +30,7 @@ const reachPerService = 3
 func (e *engine) check(ctx context.Context) []ipc.CheckItem {
 	items := []ipc.CheckItem{e.checkRules()}
 	items = append(items, e.checkExit()...)
+	items = append(items, e.checkResolver(ctx))
 	return append(items, e.checkReach(ctx)...)
 }
 
@@ -103,6 +106,31 @@ func (e *engine) checkExit() []ipc.CheckItem {
 		direct.Result, direct.Detail = ipc.CheckOK, "российские адреса идут через туннель"
 	}
 	return []ipc.CheckItem{exit, direct}
+}
+
+// checkResolver — доходят ли запросы до резолвера службы: туда система шлёт
+// имена защищённых доменов. Спрашивает сама служба по петле, как и система, и
+// запросом без вопроса: резолвер отвечает на него сразу (FORMERR), не ходя в
+// сеть, — любой ответ значит, что дорога открыта.
+func (e *engine) checkResolver(ctx context.Context) ipc.CheckItem {
+	it := ipc.CheckItem{Name: "Резолвер"}
+	if !e.dnsAddr.IsValid() {
+		it.Result, it.Detail = ipc.CheckWarn, "адрес резолвера службы неизвестен"
+		return it
+	}
+	ctx, cancel := context.WithTimeout(ctx, reachTimeout)
+	defer cancel()
+	q := new(dns.Msg)
+	q.Id = dns.Id()
+	c := &dns.Client{Net: "udp", Timeout: reachTimeout}
+	if _, _, err := c.ExchangeContext(ctx, q, e.dnsAddr.String()); err != nil {
+		it.Result = ipc.CheckFail
+		it.Detail = fmt.Sprintf("на %s не отвечает — имена защищённых доменов не разрешаются, сервисы не откроются и через VPN", e.dnsAddr)
+		it.Hint = "запросы на порт 53 режет файрвол — часто клиент VPN с защитой от утечек DNS; что с ним, видно в appguard log"
+		return it
+	}
+	it.Result, it.Detail = ipc.CheckOK, "отвечает на "+e.dnsAddr.String()
+	return it
 }
 
 // target — защищённый сервис для проверки: имя и его адреса.

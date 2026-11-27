@@ -37,6 +37,8 @@ type engine struct {
 
 	cfg    configStore
 	lookup func(ctx context.Context, domain string) ([]netip.Addr, error)
+	// dnsAddr — где слушает резолвер службы: пункт проверки спрашивает его.
+	dnsAddr netip.AddrPort
 
 	// applyMu держит reapply целиком: правила, вычисленные позже, и применяются
 	// позже, даже когда reapply зовут цикл движка и команды клиента одновременно.
